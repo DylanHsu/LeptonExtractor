@@ -1,0 +1,165 @@
+import os
+import time
+import shutil
+import subprocess
+import re
+# cannot use htcondor python binding because CMS python environment does not have the libraries
+
+libdir = os.path.dirname(os.path.realpath(__file__))
+
+class CondorRun(object):
+
+    def __init__(self, executable):
+        self.executable = executable
+        self.transfer_exec = False
+        self.hold_on_fail = False
+        self.requirements = ''
+        self.arch = 'X86_64'
+        self.group = 'group_t3mit'
+        self.aux_input = []
+        self.min_memory = 1500
+        self.num_repeats = 1
+
+        self.job_args = []
+        self.pre_args = ''
+        self.post_args = ''
+
+        self.job_names = []
+
+        self.num_concurrent = 0
+        self.logdir = '/tmp'
+        self.clear_log = False
+
+        self.last_submit = [] # [(cluster id, job name)] of last submit if job_names are set
+
+    def submit(self, name = ''):
+        if name:
+            logdir = self.logdir +'/' + name
+        else:
+            logdir = self.logdir + '/' + str(int(time.time()))
+
+        if self.clear_log:
+            try:
+                shutil.rmtree(logdir)
+            except:
+                pass
+
+        try:
+            os.mkdir(logdir)
+        except OSError:
+            pass
+
+        with open(logdir + '/env.sh', 'w') as envfile:
+            for key, value in os.environ.items():
+                if key.startswith('BASH_FUNC_'):
+                    envfile.write(key.replace('BASH_FUNC_', '') + ' ' + value[2:] + '\n')
+                    envfile.write('export -f ' + key.replace('BASH_FUNC_', '').replace('()', '') + '\n')
+                else:
+                    envfile.write('export ' + key + '="' + value.replace('"', '\\"') + '"\n')
+
+        jobs_file = open(logdir + '/jobs.dat', 'w')
+        jobs_file.write('[EXECUTABLE] ' + os.path.realpath(self.executable) + '\n')
+        jobs_file.write('[NJOBS_PER_ARG] ' + str(self.num_repeats) + '\n')
+        jobs_file.write('[ARGUMENTS]\n')
+
+        jdl_template = []
+        jdl_template.append(('executable', libdir + '/condor-run.exec'))
+        jdl_template.append(('universe', 'vanilla'))
+        jdl_template.append(('should_transfer_files', 'YES'))
+        jdl_template.append(('input', '/dev/null'))
+        requirements = 'Arch == "%s"' % self.arch
+        if self.requirements:
+            requirements += ' && (%s)' % self.requirements
+        jdl_template.append(('requirements', requirements))
+        jdl_template.append(('rank', '32 - TARGET.SlotID')) # evenly distribute jobs across machines
+
+        input_files = [logdir + '/env.sh'] + self.aux_input
+        if self.transfer_exec:
+            input_files.append(os.path.realpath(self.executable))
+        jdl_template.append(('transfer_input_files', ','.join(input_files)))
+
+        jdl_template.append(('transfer_output_files', '""'))
+        jdl_template.append(('accounting_group', self.group))
+        jdl_template.append(('request_memory', self.min_memory))
+        if self.hold_on_fail:
+            jdl_template.append(('on_exit_hold', '(ExitBySignal == True) || (ExitCode != 0)'))
+       
+        with open(logdir + '/jdl.template', 'w') as template_file:
+            for key, value in jdl_template:
+                template_file.write('%s = %s\n' % (key, str(value)))
+        
+        clusters = []
+        self.last_submit = []
+        num_current = 0
+
+        if len(self.job_args):
+            job_args = list(self.job_args)
+        else:
+            job_args = ['']
+
+        use_job_names = (len(set(self.job_names)) == len(job_args))
+        
+        for ijob, job_arg in enumerate(job_args):
+            jdl = list(jdl_template)
+
+            if use_job_names:
+                jdl.append(('log', logdir + '/%s.$(Process).log' % self.job_names[ijob]))
+                jdl.append(('output', logdir + '/%s.$(Process).out' % self.job_names[ijob]))
+                jdl.append(('error', logdir + '/%s.$(Process).err' % self.job_names[ijob]))
+            else:
+                jdl.append(('log', logdir + '/$(Cluster).$(Process).log'))
+                jdl.append(('output', logdir + '/$(Cluster).$(Process).out'))
+                jdl.append(('error', logdir + '/$(Cluster).$(Process).err'))
+            
+            if self.transfer_exec:
+                arg = '"./' + os.path.basename(self.executable)
+            else:
+                arg = '"' + re.sub('^/export', '', os.path.realpath(self.executable))
+
+            arg += ' ' + self.pre_args + ' ' + job_arg + ' ' + self.post_args
+            if self.num_repeats > 1:
+                arg += ' $(Process)'
+
+            arg += '"'
+
+            jdl.append(('arguments', arg))
+        
+            jobs_file.write(arg + '\n')
+
+            jdl_text = ''.join(['%s = %s\n' % (key, str(value)) for key, value in jdl])
+            jdl_text += 'queue ' + str(self.num_repeats) + '\n'
+
+            proc = subprocess.Popen(['condor_submit'], stdin = subprocess.PIPE, stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
+            out, err = proc.communicate(jdl_text)
+            print out.strip()
+
+            matches = re.search('job\(s\) submitted to cluster ([0-9]+)\.', out)
+            if matches:
+                clusters.append(matches.group(1))
+                if use_job_names:
+                    self.last_submit.append((matches.group(1), self.job_names[ijob]))
+            else:
+                print 'No cluster id found!'
+        
+            num_current += self.num_repeats
+        
+            if self.num_concurrent != 0 and num_current >= self.num_concurrent:
+                time.sleep(2)
+        
+                while True:
+                    proc = subprocess.Popen(['condor_q'] + clusters, stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
+                    out, err = proc.communicate()
+                    num_current = len(out.split('')) - 7
+                    sys.stdout.write('\r%d current jobs' % num_current)
+                    sys.stdout.flush()
+        
+                    if num_current < self.num_concurrent:
+                        break
+                    else:
+                        time.sleep(60)
+        
+        jobs_file.close()
+        
+        print 'Logdir is', logdir
+ 
+        return clusters
