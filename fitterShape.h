@@ -38,15 +38,20 @@ namespace fitterShape {
   kBkgDasPlusExp,
   kBkgDas,
   kBkgDoubleExp,
+  kBkgTemplate,
+  kBkgTemplatePlusExp,
+  kBkgTwoTemplates,
   nShapeTypes
  };
  class fitterShapeBase {
   public:
    fitterShapeBase():theShape(0){}
    virtual ~fitterShapeBase() { delete theShape; }
-   RooAbsPdf *theShape;
+   RooAbsPdf *theShape=0;
+   RooAbsPdf *resolutionFunction=0;
    TString plotLabel;
-   TH1D *templateHist;
+   TH1D *templateHist=0;
+   TH1D *templateHist2=0;// hack, make it better later
    void initializeParams(std::map<std::string, double> &initialization);
  };
  class templateConvDas: public fitterShapeBase {
@@ -109,6 +114,27 @@ class bkgErfcExpPlusExp: public fitterShapeBase {
    RooRealVar *t1,*t2,*frac;
    RooExponential *exp1, *exp2;
  };
+ class bkgTemplate: public fitterShapeBase {
+  public:
+   bkgTemplate(RooRealVar &m, TH1D *templateHist_, TString plotLabel_);
+   ~bkgTemplate();
+   RooDataHist *templateRDH;
+ };
+ class bkgTemplatePlusExp: public fitterShapeBase {
+  public:
+   bkgTemplatePlusExp(RooRealVar &m, TH1D *templateHist_, TString plotLabel_);
+   ~bkgTemplatePlusExp();
+   RooRealVar *t1,*frac;
+   RooExponential *exp1;
+   RooDataHist *templateRDH; RooHistPdf *templateRHP;
+ };
+ class bkgTwoTemplates: public fitterShapeBase {
+  public:
+   bkgTwoTemplates(RooRealVar &m, TH1D *templateHist_, TH1D *templateHist2_, TString plotLabel_);
+   ~bkgTwoTemplates();
+   RooRealVar *frac;
+   RooDataHist *templateRDH, *templateRDH2; RooHistPdf *templateRHP, *templateRHP2;
+ };
  // Parent class definitions
  ////////////////////////////////////////////////////
  // Child class definitions
@@ -124,6 +150,7 @@ class bkgErfcExpPlusExp: public fitterShapeBase {
    templateRDH = new RooDataHist("templateRDH","templateRDH",RooArgSet(m),templateHist_);
    templateRHP = new RooHistPdf("templateRHP","templateRHP",m,*templateRDH,2);
    theShape=new RooFFTConvPdf("signalModel","signalModel",m,*templateRHP,*dd);
+   resolutionFunction=dd;
  } 
  templateConvDas::~templateConvDas() {
   delete mean; delete sigma; delete kLo; delete kHi;
@@ -139,6 +166,7 @@ class bkgErfcExpPlusExp: public fitterShapeBase {
    templateRDH = new RooDataHist("templateRDH","templateRDH",RooArgSet(m),templateHist_);
    templateRHP = new RooHistPdf("templateRHP","templateRHP",m,*templateRDH,2);
    theShape=new RooFFTConvPdf("signalModel","signalModel",m,*templateRHP,*gaus);
+   resolutionFunction=gaus;
  } 
  templateConvGaus::~templateConvGaus() {
   delete templateRHP; delete templateRDH;
@@ -153,6 +181,7 @@ class bkgErfcExpPlusExp: public fitterShapeBase {
    gaus   = new RooGaussian("gaus","gaus",m,*mean,*sigma);
    templateRDH = new RooDataHist("templateRDH","templateRDH",RooArgSet(m),templateHist_);
    templateRHP = new RooHistPdf("templateRHP","templateRHP",m,*templateRDH,2);
+   resolutionFunction=gaus;
    
    mass   = new RooRealVar("sig_mass" , "sig_mass" ,91.1876,    80, 99); mass->setConstant(kTRUE);
    width  = new RooRealVar("sig_width", "sig_width", 2.4952,    .1, 10); width->setConstant(kTRUE);
@@ -177,6 +206,7 @@ class bkgErfcExpPlusExp: public fitterShapeBase {
    width  = new RooRealVar("sig_width", "sig_width", 2.4952,    .1, 10); width->setConstant(kTRUE);
    bw = new RooBreitWigner("bw","bw",m,*mass,*width);
    dd = new RooGaussDoubleSidedExp("dd","dd",m,*mean,*sigma,*kLo,*kHi);
+   resolutionFunction=dd;
    theShape=new RooFFTConvPdf("signalModel","signalModel",m,*bw,*dd);
  } 
  breitWignerConvDas::~breitWignerConvDas() {
@@ -216,9 +246,9 @@ class bkgErfcExpPlusExp: public fitterShapeBase {
  bkgDasPlusExp::bkgDasPlusExp(RooRealVar &m, TH1D *templateHist_) {
   plotLabel="Bkg.: Das + exp"; 
   mean   = new RooRealVar("bkg_mean" , "bkg_mean" ,   60,    30,200);
-  sigma  = new RooRealVar("bkg_sigma", "bkg_sigma",   12,    10,100);
-  kLo    = new RooRealVar("bkg_kLo"  , "bkg_kLo"  ,  1.5,    .1, 10);
-  kHi    = new RooRealVar("bkg_kHi"  , "bkg_kHi"  ,  1.5,    .1, 10);
+  sigma  = new RooRealVar("bkg_sigma", "bkg_sigma",   12,    10, 30);
+  kLo    = new RooRealVar("bkg_kLo"  , "bkg_kLo"  ,  1.5,   .02, 10);
+  kHi    = new RooRealVar("bkg_kHi"  , "bkg_kHi"  ,  1.5,   .02, 10);
   dd = new RooGaussDoubleSidedExp("bkgDas","bkgDas",m,*mean,*sigma,*kLo,*kHi);
   t1   = new RooRealVar("bkg_t1"  ,"bkg_t1"  ,-0.20,-.4,.4);
   frac = new RooRealVar("bkg_frac","bkg_frac", 0.05, 0.,1.);
@@ -233,9 +263,9 @@ class bkgErfcExpPlusExp: public fitterShapeBase {
  bkgDas::bkgDas(RooRealVar &m, TH1D *templateHist_) {
   plotLabel="Bkg.: Wide Das"; 
   mean   = new RooRealVar("bkg_mean" , "bkg_mean" ,   60,    30,200);
-  sigma  = new RooRealVar("bkg_sigma", "bkg_sigma",   12,    10,100);
-  kLo    = new RooRealVar("bkg_kLo"  , "bkg_kLo"  ,  1.5,   .1, 10); 
-  kHi    = new RooRealVar("bkg_kHi"  , "bkg_kHi"  ,  1.5,   .1, 10);
+  sigma  = new RooRealVar("bkg_sigma", "bkg_sigma",   12,    10,30);
+  kLo    = new RooRealVar("bkg_kLo"  , "bkg_kLo"  ,  1.5,   .02, 10); 
+  kHi    = new RooRealVar("bkg_kHi"  , "bkg_kHi"  ,  1.5,   .02, 10);
   theShape = new RooGaussDoubleSidedExp("bkgModel","bkgModel",m,*mean,*sigma,*kLo,*kHi);
  }
  bkgDas::~bkgDas() {
@@ -254,6 +284,48 @@ class bkgErfcExpPlusExp: public fitterShapeBase {
  bkgDoubleExp::~bkgDoubleExp() {
   delete exp1; delete exp2;
   delete t1; delete t2; delete frac;
+ }
+ ////////////////////////////////////////////////////
+ bkgTemplate::bkgTemplate(RooRealVar &m, TH1D *templateHist_, TString plotLabel_) {
+   if(plotLabel_!="")plotLabel=plotLabel_; else plotLabel="Bkg.: Data driven";
+   templateHist=templateHist_; assert(templateHist);
+   templateRDH = new RooDataHist("bkgTemplateRDH","bkgTemplateRDH",RooArgSet(m),templateHist_);
+   theShape=new RooHistPdf("bkgModel","bkgModel",m,*templateRDH,2);
+ } 
+ bkgTemplate::~bkgTemplate() {
+  delete templateRDH;
+ }
+ ////////////////////////////////////////////////////
+ bkgTemplatePlusExp::bkgTemplatePlusExp(RooRealVar &m, TH1D *templateHist_, TString plotLabel_) {
+   if(plotLabel_!="")plotLabel=plotLabel_; else plotLabel="Bkg.: Data driven";
+   templateHist=templateHist_; assert(templateHist);
+   templateRDH = new RooDataHist("bkgTemplatePlusExpRDH","bkgTemplatePlusExpRDH",RooArgSet(m),templateHist_);
+   templateRHP = new RooHistPdf("bkgTemplatePlusExpRHP","bkgTemplatePlusExpRHP",m,*templateRDH,2);
+   t1   = new RooRealVar("bkg_t1"  ,"bkg_t1"  ,-0.20,-1.,0.);
+   frac = new RooRealVar("bkg_frac","bkg_frac", 0.90, 0.,1.);
+   exp1 = new RooExponential("bkg_exp1","bkg_exp1",m,*t1);
+   theShape=new RooAddPdf("bkgModel","bkgModel",RooArgList(*templateRHP,*exp1),RooArgList(*frac));
+ } 
+ bkgTemplatePlusExp::~bkgTemplatePlusExp() {
+  delete templateRHP; delete templateRDH;
+  delete t1; delete frac; delete exp1;
+ }
+ ////////////////////////////////////////////////////
+ bkgTwoTemplates::bkgTwoTemplates(RooRealVar &m, TH1D *templateHist_, TH1D *templateHist2_, TString plotLabel_) {
+   if(plotLabel_!="")plotLabel=plotLabel_; else plotLabel="Bkg.: Data driven";
+   templateHist =templateHist_ ; assert(templateHist );
+   templateHist2=templateHist2_; assert(templateHist2);
+   templateRDH = new RooDataHist("bkgTemplateRDH","bkgTemplateRDH",RooArgSet(m),templateHist_);
+   templateRHP = new RooHistPdf("bkgTemplateRHP","bkgTemplateRHP",m,*templateRDH,2);
+   templateRDH2 = new RooDataHist("bkgTemplateRDH2","bkgTemplateRDH2",RooArgSet(m),templateHist2_);
+   templateRHP2 = new RooHistPdf("bkgTemplateRHP2","bkgTemplateRHP2",m,*templateRDH2,2);
+   frac = new RooRealVar("bkg_frac","bkg_frac", 0.5, 0.,1.);
+   theShape=new RooAddPdf("bkgModel","bkgModel",RooArgList(*templateRHP,*templateRHP2),RooArgList(*frac));
+ } 
+ bkgTwoTemplates::~bkgTwoTemplates() {
+  delete templateRHP; delete templateRDH;
+  delete templateRHP2; delete templateRDH2;
+  delete frac;
  }
  ////////////////////////////////////////////////////
 } 

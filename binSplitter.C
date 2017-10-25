@@ -19,14 +19,15 @@
 //const Int_t nMuEtaBins=24;
 
 // Selection: Zll | em | e+e+ | m+m+ | pm | pe
-
+enum massSelType { kZll, kEM, kZeeSameSign, kZmmSameSign, kMuPi, kEPi, kGenZll, knSelTypes};
 void binSplitter(
   TString inputFileName, 
   TString outputFileName, 
   std::string binFile, 
   double scalefactor=1, 
   bool isMC=true,
-  std::string selection="Zll"
+  massSelType selection = kZll,
+  bool alt_tag=false
 ) {
   if(inputFileName==outputFileName) { printf("check output file name!\n"); return; }
   // parse bin file
@@ -85,10 +86,11 @@ void binSplitter(
   float        scale1fb;                  // event weight per 1/fb
   float        mass;                      // tag-probe mass
   int          qtag, qprobe;              // tag, probe charge
-  int          pidTag, pidProbe;              // tag, probe PID
+  int          tagPid, probePid;              // tag, probe PID
   float        met;
   int          njets;
   TLorentzVector *tag=0, *probe=0;        // tag, probe 4-vector
+  TLorentzVector *genp4_tag=0, *genp4_probe=0;        // tag, probe 4-vector
   
   //inputTree->SetBranchAddress("runNum",   &runNum);
   //inputTree->SetBranchAddress("lumiSec",  &lumiSec);
@@ -100,10 +102,12 @@ void binSplitter(
   inputTree->SetBranchAddress("mass",     &mass);
   inputTree->SetBranchAddress("qtag",     &qtag);
   inputTree->SetBranchAddress("qprobe",   &qprobe);
-  //inputTree->SetBranchAddress("pidTag",     &pidTag);
-  //inputTree->SetBranchAddress("pidProbe",   &pidProbe);
+  inputTree->SetBranchAddress("tagPid",     &tagPid);
+  inputTree->SetBranchAddress("probePid",   &probePid);
   inputTree->SetBranchAddress("tag",      &tag);
   inputTree->SetBranchAddress("probe",    &probe);
+  if(selection==kGenZll) inputTree->SetBranchAddress("genTag",      &genp4_tag);
+  if(selection==kGenZll) inputTree->SetBranchAddress("genProbe",    &genp4_probe);
   //inputTree->SetBranchAddress("met",      &met);
   //inputTree->SetBranchAddress("njets",    &njets);
   
@@ -111,7 +115,7 @@ void binSplitter(
   TH1D *histosPass[2048], *histosFail[2048];
   assert(outputFile && outputFile->IsOpen());
   int iHisto=0;
-  for(int iPt=0;iPt<fPtBinEdgesv.size()-1; iPt++) { for(int iEta=0; iEta<fEtaBinEdgesv.size()-1; iEta++) {
+  for(unsigned iPt=0;iPt<fPtBinEdgesv.size()-1; iPt++) { for(unsigned iEta=0; iEta<fEtaBinEdgesv.size()-1; iEta++) {
     char histName[256];
     sprintf(histName,"pass_ptBin%d_etaBin%d", iPt, iEta);
     histosPass[iHisto] = new TH1D(histName,histName,50,40,140);
@@ -120,30 +124,42 @@ void binSplitter(
     iHisto++;
   }}
   int iHistoMax=iHisto-1;
-  TH1F *hDTotalMCWeight = (TH1F*)inputFile->Get("hDTotalMCWeight");
-  assert(!isMC || hDTotalMCWeight);
+  TH1F *sum_weights = (TH1F*)inputFile->Get("sum_weights");
+  assert(!isMC || sum_weights);
   
   for(unsigned int ientry=0; ientry<(unsigned int)inputTree->GetEntries(); ientry++) {
     inputTree->GetEntry(ientry);
     if(ientry%1000000==0) printf("reading entry %d/%d\n",ientry,(unsigned int)inputTree->GetEntries());
-    bool passSelection=false;
-    //if     (selection=="Zll")    passSelection=(pidTag+pidProbe==0 && (pidTag==13||pidTag==-13||pidTag==11||pidTag==-11));
-    if     (selection=="Zll")    passSelection=(qtag+qprobe==0);
-    else if(selection=="em")     passSelection=false;
-    if(!passSelection) continue; // no same sign events for now
     if(mass<40.||mass>=140.) continue;
+    bool passSelection=false;
+    if     (selection==         kZll ) passSelection=(tagPid+probePid==0 && (tagPid==13||tagPid==-13||tagPid==11||tagPid==-11));
+    else if(selection==      kGenZll ) passSelection=(tagPid+probePid==0 && (tagPid==13||tagPid==-13||tagPid==11||tagPid==-11));
+    else if(selection==          kEM ) passSelection=((TMath::Abs(tagPid)==13 && TMath::Abs(probePid)==11)||(TMath::Abs(tagPid)==11 && TMath::Abs(probePid==13)))&&(tag->Pt()>=30.);
+    else if(selection== kZeeSameSign ) passSelection=(tagPid==11&&probePid==11)||(tagPid==-11&&probePid==-11);
+    else if(selection== kZmmSameSign ) passSelection=(tagPid==13&&probePid==13)||(tagPid==-13&&probePid==-13);
+    else if(selection==        kMuPi ) passSelection=(tagPid==13&&probePid==-211)||(tagPid==-13&&probePid==211);
+    else if(selection==         kEPi ) passSelection=(tagPid==11&&probePid==-211)||(tagPid==-11&&probePid==211);
+    else                               passSelection=false;
+    if(alt_tag) passSelection &= (
+      ((tagPid==13||tagPid==-13) && tag->Pt()>30 && (tag->Eta()<2.1||tag->Eta()>-2.1)) ||
+      ((tagPid==11||tagPid==-11) && tag->Pt()>35 && (tag->Eta()<2.1||tag->Eta()>-2.1))
+    );
+    if(!passSelection) continue;
     iHisto=0;
-    for(int iPt=0;iPt<fPtBinEdgesv.size()-1; iPt++) { for(int iEta=0; iEta<fEtaBinEdgesv.size()-1; iEta++) {
-      double pt=probe->Pt();
+    bool ignoreEtaHighEnergy=(selection==kMuPi || selection==kEPi || selection==kEM);
+    bool ignorePassFlag=(selection==kMuPi || selection==kEPi || selection==kEM);
+    for(unsigned iPt=0;iPt<fPtBinEdgesv.size()-1; iPt++) { for(unsigned iEta=0; iEta<fEtaBinEdgesv.size()-1; iEta++) {
+      double pt=probe->Pt(); 
       if(pt >= fPtBinEdgesv[iPt] && pt < fPtBinEdgesv[iPt+1]) { 
       double eta = fDoAbsEta? fabs(probe->Eta()) : probe->Eta();
-        if(eta >= fEtaBinEdgesv[iEta] && eta < fEtaBinEdgesv[iEta+1]) {
+      bool passEta=(eta >= fEtaBinEdgesv[iEta] && eta < fEtaBinEdgesv[iEta+1]) || (pt >= 50 && ignoreEtaHighEnergy);
+        if(passEta) {
           double weight;
-          if(isMC) {
-            weight = scale1fb / hDTotalMCWeight->Integral() * scalefactor;
-          } else weight=1;
-          if(pass) histosPass[iHisto]->Fill(mass,weight);
-          else     histosFail[iHisto]->Fill(mass,weight);
+          if(isMC) weight = scale1fb / sum_weights->GetBinContent(1) * scalefactor;
+          else     weight = 1;
+          if(selection==kGenZll) { TLorentzVector genDilep = (*genp4_tag) + (*genp4_probe); mass=genDilep.M(); }
+          if(pass  || ignorePassFlag) histosPass[iHisto]->Fill(mass,weight);
+          if(!pass || ignorePassFlag) histosFail[iHisto]->Fill(mass,weight);
         }
       }
       iHisto++;
@@ -200,7 +216,7 @@ void generateJobArgs(string outDir, std::string binFile, string flavor="electron
   }
   ifs.close();
   std::ofstream ofs; ofs.open(Form("%s/jobArgs.txt",outDir.c_str())); assert(ofs.is_open());
-  for(int iPt=0;iPt<fPtBinEdgesv.size()-1; iPt++) { for(int iEta=0; iEta<fEtaBinEdgesv.size()-1; iEta++) {
+  for(unsigned iPt=0;iPt<fPtBinEdgesv.size()-1; iPt++) { for(unsigned iEta=0; iEta<fEtaBinEdgesv.size()-1; iEta++) {
     TString titleStringPass,titleStringFail;
     if(flavor=="muons") {
       titleStringPass=Form("Z#rightarrow#mu#mu, passing probes p_{T}[%d,%d] #eta[%.4f,%.4f]",(int)fPtBinEdgesv[iPt],(int)fPtBinEdgesv[iPt+1],fEtaBinEdgesv[iEta],fEtaBinEdgesv[iEta+1]);
