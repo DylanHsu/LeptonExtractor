@@ -9,6 +9,8 @@ mkdir -p $jobDir/plots 2>/dev/null
 cd ..
 if [ "$cacheDir" == "" ]
 then
+  #cacheDir="$jobDir/submit"
+  #mkdir -p $cacheDir
   PandaCore/bin/submit --exec LeptonExtractor/runFitBin.sh --arglist $jobDir/jobArgs.txt
 else
   PandaCore/bin/submit --exec LeptonExtractor/runFitBin.sh --arglist $jobDir/jobArgs.txt --cache $cacheDir
