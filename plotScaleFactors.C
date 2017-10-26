@@ -137,7 +137,7 @@ void scale_factors(string plots_dir, string root_dir, string basename_config, in
     TPaletteAxis *palette_axis; TCanvas *canvas[5]; TH2D* theHist[5]; int thePalette[5];
     thePalette[0]=kBlackBody; canvas[0]=new TCanvas("c_eff_data"   ,"c_eff_data"   ,width,height); theHist[0]=h_eff_data   ; h_eff_data   ->SetMinimum(  0); h_eff_data   ->SetMaximum(  1);
     thePalette[1]=kBlackBody; canvas[1]=new TCanvas("c_eff_mc"     ,"c_eff_mc"     ,width,height); theHist[1]=h_eff_mc     ; h_eff_mc     ->SetMinimum(  0); h_eff_mc     ->SetMaximum(  1);
-    thePalette[2]=kBlackBody; canvas[2]=new TCanvas("c_sf"         ,"c_sf"         ,width,height); theHist[2]=h_sf         ; h_sf         ->SetMinimum(0.5); h_sf         ->SetMaximum(1.5);
+    thePalette[2]=kBlackBody; canvas[2]=new TCanvas("c_sf"         ,"c_sf"         ,width,height); theHist[2]=h_sf         ; h_sf         ->SetMinimum(0.8); h_sf         ->SetMaximum(1.2);
     thePalette[3]=kCool;      canvas[3]=new TCanvas("c_sf_error_hi","c_sf_error_hi",width,height); theHist[3]=h_sf_error_hi; h_sf_error_hi->SetMinimum(  0); h_sf_error_hi->SetMaximum(0.1);
     thePalette[4]=kCool;      canvas[4]=new TCanvas("c_sf_error_lo","c_sf_error_lo",width,height); theHist[4]=h_sf_error_lo; h_sf_error_lo->SetMinimum(  0); h_sf_error_lo->SetMaximum(0.1);
 
@@ -184,8 +184,8 @@ void scale_factors(string plots_dir, string root_dir, string basename_config, in
       palette_axis->SetLabelSize(0.02);
       canvas[i]->Update();
       for(int nl=0;nl<nLines;nl++) lines[nl]->Draw("SAME");
-      canvas[i]->Print(Form("%s%s_%f-%f_%f-%f.png",plots_dir.c_str(),theHist[i]->GetName(),xmin,xmax,ymin,ymax));
-      canvas[i]->Print(Form("%s%s_%f-%f_%f-%f.pdf",plots_dir.c_str(),theHist[i]->GetName(),xmin,xmax,ymin,ymax));
+      canvas[i]->Print(Form("%s%s_%.1f-%.1f_%.1f-%.1f.png",plots_dir.c_str(),theHist[i]->GetName(),xmin,xmax,ymin,ymax));
+      canvas[i]->Print(Form("%s%s_%.1f-%.1f_%.1f-%.1f.pdf",plots_dir.c_str(),theHist[i]->GetName(),xmin,xmax,ymin,ymax));
     }
 
     for(unsigned i=0;i<5;i++) {
@@ -208,3 +208,44 @@ void scale_factors(string plots_dir, string root_dir, string basename_config, in
   printf("Saved efficiencies, scale factors, and statistical errors in %s\n", (root_dir+output_rootfile_name).c_str());
 }
 
+void doAll() {
+  system("rm 2017-10-19/*/*/*_Medium_Muon*.p*");
+  system("rm 2017-10-19/*/*/*_Medium_Electron*.p*");
+  scale_factors("2017-10-19/electrons/bkg_lpi_emu","2017-10-19/electrons/bkg_lpi_emu","ele_medium_2016.cfg",2400,1200,0,0,10,40);
+  scale_factors("2017-10-19/electrons/bkg_lpi_emu","2017-10-19/electrons/bkg_lpi_emu","ele_medium_2016.cfg",2400,1200,0,0,40,100);
+  scale_factors("2017-10-19/electrons/sig_fsrUp","2017-10-19/electrons/sig_fsrUp","ele_medium_2016.cfg",2400,1200,0,0,10,40);
+  scale_factors("2017-10-19/electrons/sig_fsrUp","2017-10-19/electrons/sig_fsrUp","ele_medium_2016.cfg",2400,1200,0,0,40,100);
+  scale_factors("2017-10-19/electrons/sig_fsrDown","2017-10-19/electrons/sig_fsrDown","ele_medium_2016.cfg",2400,1200,0,0,10,40);
+  scale_factors("2017-10-19/electrons/sig_fsrDown","2017-10-19/electrons/sig_fsrDown","ele_medium_2016.cfg",2400,1200,0,0,40,100);
+  scale_factors("2017-10-19/electrons/sig_genmc","2017-10-19/electrons/sig_genmc","ele_medium_2016.cfg",2400,1200,0,0,10,40);
+  scale_factors("2017-10-19/electrons/sig_genmc","2017-10-19/electrons/sig_genmc","ele_medium_2016.cfg",2400,1200,0,0,40,100);
+  scale_factors("2017-10-19/electrons/alt_tag","2017-10-19/electrons/alt_tag","ele_medium_2016.cfg",2400,1200,0,0,10,40);
+  scale_factors("2017-10-19/electrons/alt_tag","2017-10-19/electrons/alt_tag","ele_medium_2016.cfg",2400,1200,0,0,40,100);
+  scale_factors("2017-10-19/electrons/nominal","2017-10-19/electrons/nominal","ele_medium_2016.cfg",2400,1200,0,0,10,40);
+  scale_factors("2017-10-19/electrons/nominal","2017-10-19/electrons/nominal","ele_medium_2016.cfg",2400,1200,0,0,40,100);
+  scale_factors("2017-10-19/electrons/mc_lo","2017-10-19/electrons/mc_lo","ele_medium_2016_lo.cfg",2400,1200,0,0,10,40);
+  scale_factors("2017-10-19/electrons/mc_lo","2017-10-19/electrons/mc_lo","ele_medium_2016_lo.cfg",2400,1200,0,0,40,100);
+  
+  scale_factors("2017-10-19/muons/bkg_lpi","2017-10-19/muons/bkg_lpi","mu_medium_2016.cfg",2400,1200,0,0,10,40);
+  scale_factors("2017-10-19/muons/bkg_lpi","2017-10-19/muons/bkg_lpi","mu_medium_2016.cfg",2400,1200,0,0,40,50);
+  scale_factors("2017-10-19/muons/bkg_lpi","2017-10-19/muons/bkg_lpi","mu_medium_2016.cfg",2400,1200,0,0,50,100);
+  scale_factors("2017-10-19/muons/sig_fsrUp","2017-10-19/muons/sig_fsrUp","mu_medium_2016.cfg",2400,1200,0,0,10,40);
+  scale_factors("2017-10-19/muons/sig_fsrUp","2017-10-19/muons/sig_fsrUp","mu_medium_2016.cfg",2400,1200,0,0,40,50);
+  scale_factors("2017-10-19/muons/sig_fsrUp","2017-10-19/muons/sig_fsrUp","mu_medium_2016.cfg",2400,1200,0,0,50,100);
+  scale_factors("2017-10-19/muons/sig_fsrDown","2017-10-19/muons/sig_fsrDown","mu_medium_2016.cfg",2400,1200,0,0,10,40);
+  scale_factors("2017-10-19/muons/sig_fsrDown","2017-10-19/muons/sig_fsrDown","mu_medium_2016.cfg",2400,1200,0,0,40,50);
+  scale_factors("2017-10-19/muons/sig_fsrDown","2017-10-19/muons/sig_fsrDown","mu_medium_2016.cfg",2400,1200,0,0,50,100);
+  scale_factors("2017-10-19/muons/sig_genmc","2017-10-19/muons/sig_genmc","mu_medium_2016.cfg",2400,1200,0,0,10,40);
+  scale_factors("2017-10-19/muons/sig_genmc","2017-10-19/muons/sig_genmc","mu_medium_2016.cfg",2400,1200,0,0,40,50);
+  scale_factors("2017-10-19/muons/sig_genmc","2017-10-19/muons/sig_genmc","mu_medium_2016.cfg",2400,1200,0,0,50,100);
+  scale_factors("2017-10-19/muons/alt_tag","2017-10-19/muons/alt_tag","mu_medium_2016.cfg",2400,1200,0,0,10,40);
+  scale_factors("2017-10-19/muons/alt_tag","2017-10-19/muons/alt_tag","mu_medium_2016.cfg",2400,1200,0,0,40,50);
+  scale_factors("2017-10-19/muons/alt_tag","2017-10-19/muons/alt_tag","mu_medium_2016.cfg",2400,1200,0,0,50,100);
+  scale_factors("2017-10-19/muons/nominal","2017-10-19/muons/nominal","mu_medium_2016.cfg",2400,1200,0,0,10,40);
+  scale_factors("2017-10-19/muons/nominal","2017-10-19/muons/nominal","mu_medium_2016.cfg",2400,1200,0,0,40,50);
+  scale_factors("2017-10-19/muons/nominal","2017-10-19/muons/nominal","mu_medium_2016.cfg",2400,1200,0,0,50,100);
+  scale_factors("2017-10-19/muons/mc_lo","2017-10-19/muons/mc_lo","mu_medium_2016_lo.cfg",2400,1200,0,0,10,40);
+  scale_factors("2017-10-19/muons/mc_lo","2017-10-19/muons/mc_lo","mu_medium_2016_lo.cfg",2400,1200,0,0,40,50);
+  scale_factors("2017-10-19/muons/mc_lo","2017-10-19/muons/mc_lo","mu_medium_2016_lo.cfg",2400,1200,0,0,50,100);
+  system("eog 2017-10-19/*/*/scalefactors*_Medium_*on_0*.png &");
+}

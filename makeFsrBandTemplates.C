@@ -82,7 +82,7 @@ void makeFsrBandTemplates(
   TH2D *h_fsrChangeFail = new TH2D("h_fsrChangeFail","h_fsrChangeFail",fEtaBinEdgesv.size()-1,fEtaBinEdgesv.data(),fPtBinEdgesv.size()-1,fPtBinEdgesv.data());
   for(unsigned int iPt=1;iPt<fPtBinEdgesv.size(); iPt++) { 
     TH1D *genZmm=0; TH1D *genZee=0;
-    unsigned m1=10,m2=40;
+    //unsigned m1=10,m2=40;
     /*for(unsigned int iEta=1; iEta<fEtaBinEdgesv.size(); iEta++) { 
       if(!genZmm) { genZmm=(TH1D*)genZmmFile->Get(Form("pass_ptBin%d_etaBin%d",iPt-1,iEta-1)); assert(genZmm); }
       else genZmm->Add((TH1D*)genZmmFile->Get(Form("pass_ptBin%d_etaBin%d",iPt-1,iEta-1)));
@@ -118,6 +118,11 @@ void makeFsrBandTemplates(
       TH1D *fsrUncBand = (TH1D*)genZmm->Clone("fsrUncBand");
       //fsrUncBand->Scale(0.9); fsrUncBand->Add(genZee,.1); fsrUncBand->Divide(genZmm);
       fsrUncBand->Scale(0.0); fsrUncBand->Add(genZee,1.0); fsrUncBand->Divide(genZmm);
+      // Do a cut off so there are no crazy values
+      for(unsigned m=m1;m<=m2;m++) {
+        if     (fsrUncBand->GetBinContent(m)>5  ) fsrUncBand->SetBinContent(m,5);
+        else if(fsrUncBand->GetBinContent(m)<0.2) fsrUncBand->SetBinContent(m,0.2);
+      }
       // Wag the tail
       TH1D *histPassFsrUp=(TH1D*)histPass->Clone("histPassFsrUp");
       TH1D *histPassFsrDown=(TH1D*)histPass->Clone("histPassFsrDown");
