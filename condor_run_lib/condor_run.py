@@ -13,7 +13,7 @@ class CondorRun(object):
         self.executable = executable
         self.transfer_exec = False
         self.hold_on_fail = False
-        self.requirements = ''
+        self.requirements = 'UidDomain == "mit.edu"'
         self.arch = 'X86_64'
         self.group = 'group_t3mit'
         self.aux_input = []
