@@ -27,8 +27,8 @@ struct leptonVariables {
 // Probe cuts determined by passing_probe_* (6 = Tight, 5 = Medium, 4 = Loose).
 
 typedef std::map<UInt_t,std::vector<std::pair <UInt_t, UInt_t> > > MapType;
-//string jsonFile = "/home/dhsu/CMSSW_8_0_26_patch1/src/MitVBFAnalysis/data/Cert_294927-300575_13TeV_PromptReco_Collisions17_JSON.txt";
-string jsonFile = "/home/dhsu/CMSSW_8_0_26_patch1/src/MitVBFAnalysis/data/Cert_271036-284044_13TeV_23Sep2016ReReco_Collisions16_JSON.txt";
+//string jsonFile = "certs/Cert_294927-300575_13TeV_PromptReco_Collisions17_JSON.txt";
+string jsonFile = "certs/Cert_271036-284044_13TeV_23Sep2016ReReco_Collisions16_JSON.txt";
 
 void animator(int iEntry, int nEntries);
 bool selector(panda::Electron const&, int, int);
@@ -144,7 +144,7 @@ void make_tnp_skim(
   //////////////////////////////////////////////////////////////////////////////////////////
   
   //Load pileup corrections
-  TFile *puFile = TFile::Open("/home/dhsu/CMSSW_8_0_26_patch1/src/Clyde_UROP/puWeights_80x_37ifb.root", "READ");
+  TFile *puFile = TFile::Open("puWeights_80x_37ifb.root", "READ");
   TH1D *puWeights = (TH1D*)puFile->Get("puWeights"); puWeights->SetDirectory(0);
   puFile->Close();  
 
@@ -202,7 +202,7 @@ void make_tnp_skim(
   std::time_t t = std::time(0);
   unsigned long int time_now = static_cast<unsigned long int>(time(NULL));
   TRandom3 rng(time_now-731178000);
-  RoccoR rochesterCorrection("/home/dhsu/CMSSW_8_0_26_patch1/src/Clyde_UROP/rcdata.2016.v3");
+  RoccoR rochesterCorrection("rcdata.2016.v3");
   
   //ACTIVE FUNCTION BEGINS:
 

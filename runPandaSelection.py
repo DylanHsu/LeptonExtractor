@@ -9,6 +9,7 @@ import subprocess
 ROOT.gROOT.SetBatch(True)
 ROOT.gSystem.Load('libPandaTreeObjects.so')
 cmsswBase = os.environ['CMSSW_BASE'];
+os.chdir(cmsswBase+'/src/LeptonExtractor')
 ROOT.gROOT.LoadMacro(cmsswBase+'/src/LeptonExtractor/pandaSelection.C+')
 
 CATALOGDIR = '/home/cmsprod/catalog/t2mit/pandaf/005'
