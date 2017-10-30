@@ -42,8 +42,8 @@ const int fitMassHi=120;
 
 void findTransferFunction(
   string histName="pass_ptBin5_etaBin12",
-  string genFileName="2017-10-19/electrons/mc_gen/DYJetsToLL_BaselineToMedium_GenMass_PtBinnedPlusInclusiveNLO_electronTnP_binnedHistos.root",
-  string recoFileName="2017-10-19/electrons/nominal/DYJetsToLL_BaselineToMedium_ScaleSmearCorrections_PtBinnedPlusInclusiveNLO_electronTnP_binnedHistos.root"
+  string genFileName="/home/dhsu/CMSSW_8_0_26_patch1/src/LeptonExtractor/2017-10-19/electrons/mc_gen/DYJetsToLL_BaselineToMedium_GenMass_PtBinnedPlusInclusiveNLO_electronTnP_binnedHistos.root",
+  string recoFileName="/home/dhsu/CMSSW_8_0_26_patch1/src/LeptonExtractor/2017-10-19/electrons/nominal/DYJetsToLL_BaselineToMedium_ScaleSmearCorrections_PtBinnedPlusInclusiveNLO_electronTnP_binnedHistos.root"
 ) {
   TFile *genFile=TFile::Open(genFileName.c_str(),"READ"); assert(genFile && genFile->IsOpen());
   TH1D *genHist=(TH1D*)genFile->Get(histName.c_str())->Clone("genHist"); assert(genHist); genHist->SetDirectory(0); genFile->Close();
