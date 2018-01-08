@@ -5,9 +5,9 @@
 #include <string>
 #include <sstream>
 #include <map>
-
+#include "TMath.h"
 #include "TH1D.h"
-
+#include "RooFit.h"
 #include "RooAbsPdf.h"
 #include "RooAddPdf.h"
 #include "RooBreitWigner.h"
@@ -17,21 +17,36 @@
 #include "RooDataSet.h"
 #include "RooExponential.h"
 #include "RooFFTConvPdf.h"
+#include "RooFormulaVar.h"
 #include "RooGaussDoubleSidedExp.cc"
 #include "RooGaussian.h"
+#include "RooGlobalFunc.h"
+#include "RooLandau.h"
+#include "RooTFnBinding.h"
 #include "RooGenericPdf.h"
 #include "RooHistPdf.h"
 //#include "RooKeysPdf.h"
 #include "RooRealVar.h"
 #include "RooVoigtian.h"
 #include "RooVoigtianShape.h"
+#include "RooPlot.h"
+#include "TF1.h"
+#include "Math/DistFunc.h"
+#include "RooTFnBinding.h" 
+#include "RooCFunction1Binding.h"
+#include "RooCFunction3Binding.h"
 
+using namespace RooFit;
 namespace fitterShape {
  // Parent and child class declarations
  enum shapeType {
   kTemplateConvDas,
   kTemplateConvGaus,
+  kTemplateConvDoubleGaus,
   kTemplateBWConvGaus,
+  kTemplateConvLandau,
+  kTemplateConvBeta,
+  kTemplateConvCrystalBall,
   kBreitWignerConvDas,
   kBkgErfcExp,
   kBkgErfcExpPlusExp,
@@ -68,6 +83,15 @@ namespace fitterShape {
    RooGaussian *gaus;
    RooDataHist *templateRDH; RooHistPdf *templateRHP;
  };
+ class templateConvDoubleGaus: public fitterShapeBase {
+ public:
+   templateConvDoubleGaus(RooRealVar &m, TH1D *templateHist_); ~templateConvDoubleGaus();
+   RooRealVar *mean1,*sigma1, *mean2, *sigma2, *frac;
+   RooGaussian *gaus1, *gaus2;
+   RooAbsPdf *sum, *theShape1, *theShape2;
+   RooDataHist *templateRDH; RooHistPdf *templateRHP;
+ };
+
  class templateBWConvGaus: public fitterShapeBase {
   public:
    templateBWConvGaus(RooRealVar &m, TH1D *templateHist_); ~templateBWConvGaus();
@@ -77,6 +101,30 @@ namespace fitterShape {
    RooBreitWigner *bw;
    RooAbsPdf *templatePlusBw;
  };
+ class templateConvLandau: public fitterShapeBase {
+ public:
+   templateConvLandau(RooRealVar &m, TH1D *templateHist_); ~templateConvLandau();
+   RooRealVar *mean,*sigma;
+   RooFormulaVar *x;
+   RooLandau *landau;
+   RooDataHist *templateRDH; RooHistPdf *templateRHP;
+ };
+ class templateConvCrystalBall: public fitterShapeBase {
+ public:
+   templateConvCrystalBall(RooRealVar &m, TH1D *templateHist_); ~templateConvCrystalBall();
+   RooRealVar *mean, *sigma, *a, *n;
+   RooCBShape *CB;
+   RooDataHist *templateRDH; RooHistPdf *templateRHP;
+ };
+
+ class templateConvBeta: public fitterShapeBase {
+ public:
+   templateConvBeta(RooRealVar &m, TH1D *templateHist_); ~templateConvBeta();
+   RooRealVar *a,*b;
+   RooAbsPdf *beta;
+   RooDataHist *templateRDH; RooHistPdf *templateRHP;
+ };
+
  class breitWignerConvDas: public fitterShapeBase {
   public:
    breitWignerConvDas(RooRealVar &m, TH1D *breitWignerHist=0); ~breitWignerConvDas();
@@ -172,6 +220,106 @@ class bkgErfcExpPlusExp: public fitterShapeBase {
   delete templateRHP; delete templateRDH;
   delete gaus; delete mean; delete sigma;
  }
+
+ ////////////////////////////////////////////////////
+ templateConvDoubleGaus::templateConvDoubleGaus(RooRealVar &m, TH1D *templateHist_) {
+   /*plotLabel="Sig.: MC #otimes Double Gaus";
+   templateHist=templateHist_; assert(templateHist);
+   mean1   = new RooRealVar("sig_mean1" , "sig_mean1" ,    0,    -5,  2);
+   sigma1  = new RooRealVar("sig_sigma1", "sig_sigma1", 0.01, 0.001,  5);
+   gaus1   = new RooGaussian("gaus1","gaus1",m,*mean1,*sigma1);
+   mean2   = new RooRealVar("sig_mean2" , "sig_mean2" ,    0,    -5,  2);
+   sigma2  = new RooRealVar("sig_sigma2", "sig_sigma2", 0.01, 0.001,  5);
+   gaus2   = new RooGaussian("gaus2","gaus2",m,*mean2,*sigma2);
+   frac = new RooRealVar("sig_frac","sig_frac", 0.05, 0.,1.);
+   templateRDH = new RooDataHist("templateRDH","templateRDH",RooArgSet(m),templateHist_);
+   templateRHP = new RooHistPdf("templateRHP","templateRHP",m,*templateRDH,2);
+   sum = new RooAddPdf("sum","sum",RooArgList(*gaus1,*gaus2),RooArgList(*frac));
+   theShape = new RooFFTConvPdf("signalModel","signalModel",m,*templateRHP,*sum);
+   resolutionFunction=sum;*/
+ 
+   plotLabel="Sig.: MC #otimes Double Gaus";
+   templateHist=templateHist_; assert(templateHist);
+   mean1   = new RooRealVar("sig_mean1" , "sig_mean1" ,    0,    -5,  2);
+   sigma1  = new RooRealVar("sig_sigma1", "sig_sigma1", 0.01, 0.001,  5);
+   gaus1   = new RooGaussian("gaus1","gaus1",m,*mean1,*sigma1);
+   mean2   = new RooRealVar("sig_mean2" , "sig_mean2" ,    0,    -5,  2);
+   sigma2  = new RooRealVar("sig_sigma2", "sig_sigma2", 0.01, 0.001,  5);
+   gaus2   = new RooGaussian("gaus2","gaus2",m,*mean2,*sigma2);
+   frac = new RooRealVar("sig_frac","sig_frac", 0.05, 0.,1.);
+   templateRDH = new RooDataHist("templateRDH","templateRDH",RooArgSet(m),templateHist_);
+   templateRHP = new RooHistPdf("templateRHP","templateRHP",m,*templateRDH,2);
+   theShape1 = new RooFFTConvPdf("signalModel1","signalModel1",m,*templateRHP,*gaus1);
+   theShape2 = new RooFFTConvPdf("signalModel2","signalModel2",m,*templateRHP,*gaus2);
+   theShape = new RooAddPdf("signalModel","signalModel",RooArgList(*theShape1,*theShape2),RooArgList(*frac));              
+   sum = new RooAddPdf("sum","sum",RooArgList(*gaus1,*gaus2),RooArgList(*frac));                                                             
+   resolutionFunction=sum;
+
+
+}
+ templateConvDoubleGaus::~templateConvDoubleGaus() {
+   delete templateRHP; delete templateRDH;
+   delete gaus1; delete mean1; delete sigma1;
+   delete gaus2; delete mean2; delete sigma2; 
+   delete frac; delete sum;
+   delete theShape1, theShape2;
+ }
+ ////////////////////////////////////////////
+ templateConvLandau::templateConvLandau(RooRealVar &m, TH1D *templateHist_) {
+   plotLabel="Sig.: MC #otimes Landau";
+   templateHist=templateHist_; assert(templateHist);
+   mean   = new RooRealVar("sig_mean" , "sig_mean" ,    0,    -5,  2);
+   sigma  = new RooRealVar("sig_sigma", "sig_sigma", 0.01, 0.001,  5);
+   x = new RooFormulaVar("arg","arg","-@0",RooArgList(m));
+   landau = new RooLandau ("landau", "landau", *x, *mean, *sigma);
+   templateRDH = new RooDataHist("templateRDH","templateRDH",RooArgSet(m),templateHist_);
+   templateRHP = new RooHistPdf("templateRHP","templateRHP",m,*templateRDH,2);
+   theShape=new RooFFTConvPdf("signalModel","signalModel",m,*templateRHP,*landau);
+   resolutionFunction=landau;
+
+ }
+ templateConvLandau::~templateConvLandau() {
+   delete templateRHP; delete templateRDH;
+   delete landau; delete mean; delete sigma;
+   delete x;
+ }
+
+ ////////////////////////////////////////////                                                                                                 
+ templateConvBeta::templateConvBeta(RooRealVar &m, TH1D *templateHist_) {
+   plotLabel="Sig.: MC #otimes Beta";
+   templateHist=templateHist_; assert(templateHist);
+   a = new RooRealVar("alpha" , "alpha" ,    0,    0.001,  5);
+   b = new RooRealVar("beta", "beta", 0.01, 0.001,  5);
+   beta = bindPdf("beta",ROOT::Math::beta_pdf,m,*a,*b) ;   
+   templateRDH = new RooDataHist("templateRDH","templateRDH",RooArgSet(m),templateHist_);
+   templateRHP = new RooHistPdf("templateRHP","templateRHP",m,*templateRDH,2);
+   theShape=new RooFFTConvPdf("signalModel","signalModel",m,*templateRHP,*beta);
+   resolutionFunction=beta;
+ }
+ templateConvBeta::~templateConvBeta() {
+   delete templateRHP; delete templateRDH;
+   delete beta; delete b; delete a;
+   }
+ 
+
+ ////////////////////////////////////////////////////                                                                                         
+ templateConvCrystalBall::templateConvCrystalBall(RooRealVar &m, TH1D *templateHist_) {
+   plotLabel="Sig.: MC #otimes CB";
+   templateHist=templateHist_; assert(templateHist);
+   mean   = new RooRealVar("sig_mean" , "sig_mean" ,    0,    -5,  2);
+   sigma  = new RooRealVar("sig_sigma", "sig_sigma", 0.01, 0.001,  5);
+   a   = new RooRealVar("sig_a" , "sig_a" ,    0,  -5  ,  2);
+   n  = new RooRealVar("sig_n", "sig_n", 0.01, 0.001,  5);
+   CB =  new RooCBShape("crystalball","crystalball",m,*mean,*sigma,*a,*n);
+   templateRDH = new RooDataHist("templateRDH","templateRDH",RooArgSet(m),templateHist_);
+   templateRHP = new RooHistPdf("templateRHP","templateRHP",m,*templateRDH,2);
+   theShape=new RooFFTConvPdf("signalModel","signalModel",m,*templateRHP,*CB);
+   resolutionFunction=CB;
+ }
+ templateConvCrystalBall::~templateConvCrystalBall() {
+   delete templateRHP; delete templateRDH;
+   delete CB; delete mean; delete sigma; delete a; delete n;
+}
  ////////////////////////////////////////////////////
  templateBWConvGaus::templateBWConvGaus(RooRealVar &m, TH1D *templateHist_) {
    plotLabel="Sig.: (MC+BW)#otimesGaus";

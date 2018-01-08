@@ -26,9 +26,11 @@ struct leptonVariables {
 // Tag cuts determined by tag_* (6 = Tight, 5 = Medium, 4 = Loose).
 // Probe cuts determined by passing_probe_* (6 = Tight, 5 = Medium, 4 = Loose).
 
+TString dirPath = TString(gSystem->Getenv("CMSSW_BASE")) + "/src/";
+
 typedef std::map<UInt_t,std::vector<std::pair <UInt_t, UInt_t> > > MapType;
 //string jsonFile = "certs/Cert_294927-300575_13TeV_PromptReco_Collisions17_JSON.txt";
-string jsonFile = "certs/Cert_271036-284044_13TeV_23Sep2016ReReco_Collisions16_JSON.txt";
+string jsonFile = Form("%sLeptonExtractor/certs/Cert_271036-284044_13TeV_23Sep2016ReReco_Collisions16_JSON.txt",dirPath.Data());
 
 void animator(int iEntry, int nEntries);
 bool selector(panda::Electron const&, int, int);
@@ -50,11 +52,12 @@ void make_tnp_skim(
                      int electron_trigger=3,
                    int muon_trigger=6,
                    double truth_matching_dR = 0.3){//max Delta-R for truth matching 
+  gSystem->Load("libPandaTreeObjects.so"); 
   
   //OUTPUT FILE:
 
   //declare output variables
-  unsigned int out_runNum, // event ID
+  unsigned out_runNum, // event ID
     out_lumiSec,
     out_evtNum,
     out_npv, // number of primary vertices
@@ -144,7 +147,9 @@ void make_tnp_skim(
   //////////////////////////////////////////////////////////////////////////////////////////
   
   //Load pileup corrections
-  TFile *puFile = TFile::Open("puWeights_80x_37ifb.root", "READ");
+  //TFile *puFile = TFile::Open(Form("%sLeptonExtractor/puWeights_80x_37ifb.root", dirPath.Data()), "READ");
+  TFile *puFile = TFile::Open(Form("%sLeptonExtractor/puWeights_2016_bf.root", dirPath.Data()), "READ");
+  //TFile *puFile = TFile::Open(Form("%sLeptonExtractor/puWeights_2016_gh.root", dirPath.Data()), "READ");
   TH1D *puWeights = (TH1D*)puFile->Get("puWeights"); puWeights->SetDirectory(0);
   puFile->Close();  
 
@@ -202,7 +207,7 @@ void make_tnp_skim(
   std::time_t t = std::time(0);
   unsigned long int time_now = static_cast<unsigned long int>(time(NULL));
   TRandom3 rng(time_now-731178000);
-  RoccoR rochesterCorrection("rcdata.2016.v3");
+  RoccoR rochesterCorrection(Form("%sLeptonExtractor/rcdata.2016.v3",dirPath.Data()));
   
   //ACTIVE FUNCTION BEGINS:
 
@@ -223,7 +228,7 @@ void make_tnp_skim(
     
     // Check data certification
     bool certifiedEvent=false;
-    std::pair<unsigned int, unsigned int> runLumi(event.runNumber, event.lumiNumber);      
+    std::pair<unsigned, unsigned> runLumi(event.runNumber, event.lumiNumber);      
     MapType::const_iterator it = fMap.find(runLumi.first);
     if (it!=fMap.end()) {
       //check lumis
@@ -250,7 +255,7 @@ void make_tnp_skim(
 
     
     //Looping over electrons in event to identify which pass tag criteria
-    unsigned int goodIsTight = 0;
+    unsigned goodIsTight = 0;
     if(event.electrons.size() != 32) for (unsigned iE = 0; iE != event.electrons.size(); ++iE) {
       auto& electron = event.electrons[iE];
       if (selector(electron, gettagprobe.tag_id, gettagprobe.tag_iso)){
@@ -288,7 +293,7 @@ void make_tnp_skim(
 
       //Determine if Jet is actually electron: if not, add to list of Jets
       bool isElectron = false; bool isMuon = false;
-      for(unsigned int iE = 0; iE != event.electrons.size(); ++iE){
+      for(unsigned iE = 0; iE != event.electrons.size(); ++iE){
         auto& electron  = event.electrons[iE];
         if (electron.loose){
           if(jet.dR(electron) < 0.16) { isElectron = true; break; }
@@ -297,7 +302,7 @@ void make_tnp_skim(
       if (isElectron == true) continue;
         
       //Determine if Jet is actually muon: if not, add to list of Jets
-      for(unsigned int iM = 0; iM != event.muons.size(); ++iM){
+      for(unsigned iM = 0; iM != event.muons.size(); ++iM){
         auto& muon  = event.muons[iM];
         if(muon.loose){
           if(jet.dR(muon) < 0.16) { isMuon = true; break; }
@@ -320,162 +325,161 @@ void make_tnp_skim(
     std::vector<double>truth_ele_tag_,truth_ele_failing_probe_,truth_ele_passing_probe_,truth_mu_tag_,truth_mu_passing_probe_,truth_mu_failing_probe_;
 
     // Loop over Electrons
-    if (event.electrons.size()>0){
-      for (unsigned iE = 0; iE != event.electrons.size(); ++iE){
-        auto& electron = event.electrons[iE];
-        if(electron.smearedPt < 10.) continue;
-        bool electron_trigger_matched = false;
-        double truth = 0;
-        int charge = electron.charge;
-        bool pass_tag_trigger = false;
-        double dR;
-        TLorentzVector genP4;
-        if (!real_data && truth_matching){
-          for (unsigned iG = 0; iG != event.genParticles.size(); ++iG){
-            auto& genParticle = event.genParticles[iG];
-            if (genParticle.finalState != 1)
-              continue;
-            TVector3 genParticle3;
-            genParticle3.SetPtEtaPhi(genParticle.pt(),genParticle.eta(),genParticle.phi());
-            dR = genParticle3.DeltaR(electron.p4().Vect());
-            if (TMath::Abs(genParticle.pdgid) == 11 && dR < truth_matching_dR) {
-              truth = TMath::Max(0.001, dR);
-              genP4.SetPtEtaPhiM(genParticle.pt(),genParticle.eta(),genParticle.phi(),511e-6);
-              break;
-            }
+    if (event.electrons.size()>0) { for (unsigned iE = 0; iE != event.electrons.size(); ++iE) {
+      auto& electron = event.electrons[iE];
+      if(electron.smearedPt < 10.) continue;
+      bool electron_trigger_matched = false;
+      double truth = 0;
+      int charge = electron.charge;
+      bool pass_tag_trigger = false;
+      double dR;
+      TLorentzVector genP4;
+      if (!real_data && truth_matching){
+        for (unsigned iG = 0; iG != event.genParticles.size(); ++iG){
+          auto& genParticle = event.genParticles[iG];
+          if (genParticle.finalState != 1)
+            continue;
+          TVector3 genParticle3;
+          genParticle3.SetPtEtaPhi(genParticle.pt(),genParticle.eta(),genParticle.phi());
+          dR = genParticle3.DeltaR(electron.p4().Vect());
+          if (TMath::Abs(genParticle.pdgid) == 11 && dR < truth_matching_dR) {
+            truth = TMath::Max(0.001, dR);
+            genP4.SetPtEtaPhiM(genParticle.pt(),genParticle.eta(),genParticle.phi(),511e-6);
+            break;
           }
-          if(truth==0) continue;
         }
+        if(truth==0) continue;
+      }
 
-        if(event.isData){
-          //            pass_tag_trigger = (electron.triggerMatch[panda::Electron::fHLT_Ele27_eta2p1_WPLoose_Gsf]);
-          pass_tag_trigger = (electron.triggerMatch[panda::Electron::fEl27Tight]);
-        } else{
-          pass_tag_trigger = true;
+      if(event.isData){
+        //            pass_tag_trigger = (electron.triggerMatch[panda::Electron::fHLT_Ele27_eta2p1_WPLoose_Gsf]);
+        pass_tag_trigger = (electron.triggerMatch[panda::Electron::fEl27Tight]);
+      } else{
+        pass_tag_trigger = true;
+      }
+      TLorentzVector lepP4; lepP4.SetPtEtaPhiM(electron.smearedPt, electron.eta(), electron.phi(), 511e-6);
+      vector<int> passing_ids = passProbe(electron, gettagprobe, pass_tag_trigger);
+      for (unsigned long i = 0; i < passing_ids.size(); i++){
+        switch(passing_ids[i]){
+        case 1:
+          //Fails Probe
+          p4_ele_failing_probe_.push_back(lepP4);
+          genp4_ele_failing_probe_.push_back(genP4);
+          q_ele_failing_probe_.push_back(charge);
+          truth_ele_failing_probe_.push_back(truth);
+          break;
+        case 2:
+          //Passes Probe
+          p4_ele_passing_probe_.push_back(lepP4);
+          genp4_ele_passing_probe_.push_back(genP4);
+          q_ele_passing_probe_.push_back(charge);
+          truth_ele_passing_probe_.push_back(truth);
+          break;
+        case 3:
+          //Passes Tag
+          p4_ele_tag_.push_back(lepP4);
+          genp4_ele_tag_.push_back(genP4);
+          q_ele_tag_.push_back(charge);
+          truth_ele_tag_.push_back(truth);
+          break;
+        default:
+          break;
         }
-        TLorentzVector lepP4; lepP4.SetPtEtaPhiM(electron.smearedPt, electron.eta(), electron.phi(), 511e-6);
-        vector<int> passing_ids = passProbe(electron, gettagprobe, pass_tag_trigger);
-        for (unsigned long i = 0; i < passing_ids.size(); i++){
-          switch(passing_ids[i]){
-          case 1:
-            //Fails Probe
-            p4_ele_failing_probe_.push_back(lepP4);
-            genp4_ele_failing_probe_.push_back(genP4);
-            q_ele_failing_probe_.push_back(charge);
-            truth_ele_failing_probe_.push_back(truth);
-            break;
-          case 2:
-            //Passes Probe
-            p4_ele_passing_probe_.push_back(lepP4);
-            genp4_ele_passing_probe_.push_back(genP4);
-            q_ele_passing_probe_.push_back(charge);
-            truth_ele_passing_probe_.push_back(truth);
-            break;
-          case 3:
-            //Passes Tag
-            p4_ele_tag_.push_back(lepP4);
-            genp4_ele_tag_.push_back(genP4);
-            q_ele_tag_.push_back(charge);
-            truth_ele_tag_.push_back(truth);
-            break;
-          default:
-            break;
-          }
-        }
-      }        
-    }
+      }
+    }}
     if (verbose){
       printf("Number of vectors in electron tag list:%lu\n", p4_ele_tag_.size());
       printf("Number of vectors in electron pass probe list:%lu\n", p4_ele_passing_probe_.size());
     }
 
     // Loop over Muons
-    if (event.muons.size()>0){
-      for (unsigned iM = 0; iM != event.muons.size(); ++iM){
-        auto& muon = event.muons[iM];
-        bool muon_trigger_matched = false;
-        int charge = muon.charge;
-        double truth;
-        bool pass_tag_trigger = false;
-        double ptCorrection=1;
-        TLorentzVector genP4;
-        if (!real_data && truth_matching){
-          for (unsigned iG = 0; iG != event.genParticles.size(); ++iG){
-            auto& genParticle = event.genParticles[iG];
-            double dR;
-            if (genParticle.finalState != 1)
-              continue;
-             TVector3 genParticle3;
-            genParticle3.SetPtEtaPhi(genParticle.pt(),genParticle.eta(),genParticle.phi());
-            dR = genParticle3.DeltaR(muon.p4().Vect());
-            if (TMath::Abs(genParticle.pdgid)==13 && dR < truth_matching_dR) {
-              truth = TMath::Max(0.001, dR);
-              double random1=rng.Rndm();
-              genP4.SetPtEtaPhiM(genParticle.pt(),genParticle.eta(),genParticle.phi(),.106);
-              ptCorrection=rochesterCorrection.kScaleFromGenMC(charge, muon.pt(), muon.eta(), muon.phi(), muon.trkLayersWithMmt, genParticle.pt(), random1, 0, 0);
-              break;
-            }
+    if (event.muons.size()>0) { for (unsigned iM = 0; iM != event.muons.size(); ++iM) {
+      auto& muon = event.muons[iM];
+      if(muon.pt()<1.) continue;
+      bool muon_trigger_matched = false;
+      int charge = muon.charge;
+      double truth;
+      bool pass_tag_trigger = false;
+      double ptCorrection=1;
+      TLorentzVector genP4;
+      if (!real_data && truth_matching){
+        for (unsigned iG = 0; iG != event.genParticles.size(); ++iG){
+          auto& genParticle = event.genParticles[iG];
+          double dR;
+          if (genParticle.finalState != 1)
+            continue;
+           TVector3 genParticle3;
+          genParticle3.SetPtEtaPhi(genParticle.pt(),genParticle.eta(),genParticle.phi());
+          dR = genParticle3.DeltaR(muon.p4().Vect());
+          if (TMath::Abs(genParticle.pdgid)==13 && dR < truth_matching_dR) {
+            truth = TMath::Max(0.001, dR);
+            double random1=rng.Rndm();
+            genP4.SetPtEtaPhiM(genParticle.pt(),genParticle.eta(),genParticle.phi(),.106);
+            ptCorrection=rochesterCorrection.kScaleFromGenMC(charge, muon.pt(), muon.eta(), muon.phi(), muon.trkLayersWithMmt, genParticle.pt(), random1, 0, 0);
+            break;
           }
-          if(truth==0) continue;
-        } else if(!real_data) {
-          double random1=rng.Rndm();
-          double random2=rng.Rndm();
-          ptCorrection=rochesterCorrection.kScaleAndSmearMC(charge, muon.pt(), muon.eta(), muon.phi(), muon.trkLayersWithMmt, random1, random2, 0, 0);
-          
-        } else {
-          ptCorrection=rochesterCorrection.kScaleDT(charge, muon.pt(), muon.eta(), muon.phi(), 0, 0);
         }
-        if (event.isData){
-          //            pass_tag_trigger = (muon.triggerMatch[panda::Muon::fIsoMu27] || muon.triggerMatch[panda::Muon::fIsoTkMu27]);
-          pass_tag_trigger = (muon.triggerMatch[panda::Muon::fIsoMu24] || muon.triggerMatch[panda::Muon::fIsoTkMu24]);
-        } else pass_tag_trigger = true;
-        double correctedPt = muon.pt()*ptCorrection;
-        if(muon.pt()>10. && muon.pt()*ptCorrection < 10. && verbose)
-          printf("Rejecting muon due to corrections. (pt,eta,phi)=%f,%f,%f ; trackLayersWithMeasurement=%d\n", muon.pt(), muon.eta(), muon.phi(), muon.trkLayersWithMmt);
-        if(correctedPt<10) continue;
-        TLorentzVector lepP4; lepP4.SetPtEtaPhiM(correctedPt,muon.eta(),muon.phi(),0.106);
-        if(lepP4.Pt()<10) continue;
+        if(truth==0) continue;
+      } else if(!real_data) {
+        double random1=rng.Rndm();
+        double random2=rng.Rndm();
+        ptCorrection=rochesterCorrection.kScaleAndSmearMC(charge, muon.pt(), muon.eta(), muon.phi(), muon.trkLayersWithMmt, random1, random2, 0, 0);
+        
+      } else {
+        ptCorrection=rochesterCorrection.kScaleDT(charge, muon.pt(), muon.eta(), muon.phi(), 0, 0);
+      }
+      if (event.isData){
+        //            pass_tag_trigger = (muon.triggerMatch[panda::Muon::fIsoMu27] || muon.triggerMatch[panda::Muon::fIsoTkMu27]);
+        pass_tag_trigger = (muon.triggerMatch[panda::Muon::fIsoMu24] || muon.triggerMatch[panda::Muon::fIsoTkMu24]);
+      } else pass_tag_trigger = true;
+      double correctedPt = muon.pt()*ptCorrection;
+      if(muon.pt()>10. && muon.pt()*ptCorrection < 10. && verbose)
+        printf("Rejecting muon due to corrections. (pt,eta,phi)=%f,%f,%f ; trackLayersWithMeasurement=%d\n", muon.pt(), muon.eta(), muon.phi(), muon.trkLayersWithMmt);
+      if(correctedPt<10) continue;
+      TLorentzVector lepP4; lepP4.SetPtEtaPhiM(correctedPt,muon.eta(),muon.phi(),0.106);
+      if(lepP4.Pt()<10) continue;
     
-        int i = 0;
-        vector<int> passing_ids = passProbe(muon, gettagprobe, pass_tag_trigger);
-        for (unsigned long i = 0; i < passing_ids.size(); i++){
-          switch(passing_ids[i]){
-          case 1: 
-            //Fails Probe
-            p4_mu_failing_probe_.push_back(lepP4);
-            genp4_mu_failing_probe_.push_back(genP4);
-            q_mu_failing_probe_.push_back(charge);
-            truth_mu_failing_probe_.push_back(truth);
-            break;
-          case 2:
-            //Passes Probe
-            p4_mu_passing_probe_.push_back(lepP4);
-            genp4_mu_passing_probe_.push_back(genP4);
-            q_mu_passing_probe_.push_back(charge);
-            truth_mu_passing_probe_.push_back(truth);
-            break;
-          case 3:
-            //Passes Tag
-            p4_mu_tag_.push_back(lepP4);
-            genp4_mu_tag_.push_back(genP4);
-            q_mu_tag_.push_back(charge);
-            truth_mu_tag_.push_back(truth);
-            break;
-          }
+      int i = 0;
+      vector<int> passing_ids = passProbe(muon, gettagprobe, pass_tag_trigger);
+      for (unsigned long i = 0; i < passing_ids.size(); i++){
+        switch(passing_ids[i]){
+        case 1: 
+          //Fails Probe
+          p4_mu_failing_probe_.push_back(lepP4);
+          genp4_mu_failing_probe_.push_back(genP4);
+          q_mu_failing_probe_.push_back(charge);
+          truth_mu_failing_probe_.push_back(truth);
+          break;
+        case 2:
+          //Passes Probe
+          p4_mu_passing_probe_.push_back(lepP4);
+          genp4_mu_passing_probe_.push_back(genP4);
+          q_mu_passing_probe_.push_back(charge);
+          truth_mu_passing_probe_.push_back(truth);
+          break;
+        case 3:
+          //Passes Tag
+          p4_mu_tag_.push_back(lepP4);
+          genp4_mu_tag_.push_back(genP4);
+          q_mu_tag_.push_back(charge);
+          truth_mu_tag_.push_back(truth);
+          break;
         }
       }
-    }
+    }}
     if (verbose){
       printf("Number of vectors in muon tag list:%lu\n", p4_mu_tag_.size());
       printf("Number of vectors in muon pass probe list:%lu\n", p4_mu_passing_probe_.size());
     }
     
+    if (!real_data) scale1fb = event.weight*puWeights->GetBinContent(event.npvTrue);
+    
     //ELECTRON PAIR ASSOCIATION:
     //associating electron pairs and filling tree
     unsigned nPassingElePairs=0, nFailingElePairs=0; if(do_electrons) {
-      for(unsigned int iTag=0; iTag < p4_ele_tag_.size(); iTag++) {
+      for(unsigned iTag=0; iTag < p4_ele_tag_.size(); iTag++) {
         // passing probes for electrons
-        for(unsigned int iProbe=0; iProbe < p4_ele_passing_probe_.size(); iProbe++) {
+        for(unsigned iProbe=0; iProbe < p4_ele_passing_probe_.size(); iProbe++) {
           pass = 1;
           *p4_tag     = p4_ele_tag_[iTag];
           *p4_probe   = p4_ele_passing_probe_[iProbe];
@@ -487,17 +491,16 @@ void make_tnp_skim(
           truth_probe  = truth_ele_passing_probe_[iProbe];
           tagPid = -11*q_ele_tag_[iTag];
           probePid = -11*q_ele_passing_probe_[iProbe];
-          if(!real_data) scale1fb = event.weight*puWeights->GetBinContent(event.npvTrue);
           // make sure they aren't the same particle with tiny delta R veto
-          if(!( p4_tag->DeltaR(*p4_probe) < .0001) ) {
-            TLorentzVector systemP4 = (*p4_tag) + (*p4_probe);
-            mass = systemP4.M();
-            electron_pair_tree->Fill();
-            nPassingElePairs++;
-          }
+          if(( p4_tag->DeltaR(*p4_probe) < .0001) ) continue;
+          TLorentzVector systemP4 = (*p4_tag) + (*p4_probe);
+          mass = systemP4.M();
+          if(mass<40.||mass>140.) continue;
+          electron_pair_tree->Fill();
+          nPassingElePairs++;
         }  
         // failing probes for electrons and filling tree
-        for(unsigned int iProbe=0; iProbe < p4_ele_failing_probe_.size(); iProbe++) {
+        for(unsigned iProbe=0; iProbe < p4_ele_failing_probe_.size(); iProbe++) {
           pass = 0;
           *p4_tag     = p4_ele_tag_[iTag];
           *p4_probe   = p4_ele_failing_probe_[iProbe];
@@ -509,23 +512,22 @@ void make_tnp_skim(
           truth_probe  = truth_ele_failing_probe_[iProbe];
           tagPid = -11*q_ele_tag_[iTag];
           probePid = -11*q_ele_failing_probe_[iProbe];
-          if (!real_data) scale1fb = event.weight*puWeights->GetBinContent(event.npvTrue);
           // make sure they aren't the same particle with tiny delta R veto
-          if(!( p4_tag->DeltaR(*p4_probe) < .0001) ) {
-            TLorentzVector systemP4 = (*p4_tag) + (*p4_probe);
-            mass = systemP4.M();          
-            electron_pair_tree->Fill();
-            nFailingElePairs++;
-          }         
+          if(( p4_tag->DeltaR(*p4_probe) < .0001) ) continue;
+          TLorentzVector systemP4 = (*p4_tag) + (*p4_probe);
+          mass = systemP4.M();          
+          if(mass<40.||mass>140.) continue;
+          electron_pair_tree->Fill();
+          nFailingElePairs++;
         } 
       }
     }
     //MUON PAIR ASSOCIATION:
     // associating muon pairs and filling tree
     unsigned nPassingMuPairs=0, nFailingMuPairs=0; if (do_muons) {
-      for (unsigned int iTag=0; iTag < p4_mu_tag_.size(); iTag++) {
+      for (unsigned iTag=0; iTag < p4_mu_tag_.size(); iTag++) {
         // passing probes for muons
-        for (unsigned int iProbe=0; iProbe < p4_mu_passing_probe_.size(); iProbe++) {
+        for (unsigned iProbe=0; iProbe < p4_mu_passing_probe_.size(); iProbe++) {
           pass = 1;
           *p4_tag     = p4_mu_tag_[iTag];
           *p4_probe   = p4_mu_passing_probe_[iProbe];
@@ -537,19 +539,18 @@ void make_tnp_skim(
           probePid = -13*q_mu_passing_probe_[iProbe];
           truth_tag    = truth_mu_tag_[iTag];
           truth_probe  = truth_mu_passing_probe_[iProbe];
-          if (!real_data) scale1fb = event.weight*puWeights->GetBinContent(event.npvTrue);
           // make sure they aren't the same particle with tiny delta R veto
-          if(!( p4_tag->DeltaR(*p4_probe) < .0001) ) {
-            TLorentzVector systemP4 = (*p4_tag) + (*p4_probe);
-            mass = systemP4.M();
-            if (verbose) printf("\t\tmade a PASSING muon pair! pTs %f, %f; system mass %f, total charge %d e\n", p4_tag->Pt(), p4_probe->Pt(), mass, qtag+qprobe);
-            muon_pair_tree->Fill();
-            nPassingMuPairs++;
-          }
+          if(( p4_tag->DeltaR(*p4_probe) < .0001) ) continue;
+          TLorentzVector systemP4 = (*p4_tag) + (*p4_probe);
+          mass = systemP4.M();
+          if(mass<40.||mass>140.) continue;
+          if (verbose) printf("\t\tmade a PASSING muon pair! pTs %f, %f; system mass %f, total charge %d e\n", p4_tag->Pt(), p4_probe->Pt(), mass, qtag+qprobe);
+          muon_pair_tree->Fill();
+          nPassingMuPairs++;
         }
         
         // failing probes for muons and filling tree
-        for(unsigned int iProbe=0; iProbe < p4_mu_failing_probe_.size(); iProbe++) {
+        for(unsigned iProbe=0; iProbe < p4_mu_failing_probe_.size(); iProbe++) {
           pass = 0;
           *p4_tag     = p4_mu_tag_[iTag];  
           *p4_probe   = p4_mu_failing_probe_[iProbe];
@@ -561,16 +562,14 @@ void make_tnp_skim(
           truth_probe  = truth_mu_failing_probe_[iProbe];
           tagPid = -13*q_mu_tag_[iTag];
           probePid = -13*q_mu_failing_probe_[iProbe];
-          if (!real_data) scale1fb = event.weight*puWeights->GetBinContent(event.npvTrue);
-            //scale1fb  = (eMC_weights*gettagprobe.xsec*1000)/(sum_mc_weights);
           // make sure they aren't the same particle with tiny delta R veto
-          if(!( p4_tag->DeltaR(*p4_probe) < .0001) ) {
-            TLorentzVector systemP4 = (*p4_tag) + (*p4_probe);
-            mass = systemP4.M();
-            if (verbose) printf("\t\tmade a FAILING muon pair! pTs %f, %f; system mass %f, total charge %d e\n", p4_tag->Pt(), p4_probe->Pt(), mass, qtag+qprobe);
-            muon_pair_tree->Fill();
-            nFailingMuPairs++;
-          }
+          if(( p4_tag->DeltaR(*p4_probe) < .0001) ) continue;
+          TLorentzVector systemP4 = (*p4_tag) + (*p4_probe);
+          mass = systemP4.M();
+          if(mass<40.||mass>140.) continue;
+          if (verbose) printf("\t\tmade a FAILING muon pair! pTs %f, %f; system mass %f, total charge %d e\n", p4_tag->Pt(), p4_probe->Pt(), mass, qtag+qprobe);
+          muon_pair_tree->Fill();
+          nFailingMuPairs++;
         } 
       }
     }
@@ -578,9 +577,9 @@ void make_tnp_skim(
     // Make e-mu pairs
     //if(do_electrons && real_data) { // electron tag muon probe pairs
     if(do_electrons) { // electron tag muon probe pairs
-      for(unsigned int iTag=0; iTag < p4_ele_tag_.size(); iTag++) {
+      for(unsigned iTag=0; iTag < p4_ele_tag_.size(); iTag++) {
         // passing probes for muons
-        for (unsigned int iProbe=0; iProbe < p4_mu_passing_probe_.size(); iProbe++) {
+        for (unsigned iProbe=0; iProbe < p4_mu_passing_probe_.size(); iProbe++) {
           pass = 1;
           *p4_tag     = p4_ele_tag_[iTag];
           *p4_probe   = p4_mu_passing_probe_[iProbe];
@@ -590,14 +589,13 @@ void make_tnp_skim(
           probePid = -13*q_mu_passing_probe_[iProbe];
           truth_tag    = truth_ele_tag_[iTag];
           truth_probe  = truth_mu_passing_probe_[iProbe];
-          if(!real_data) scale1fb = event.weight*puWeights->GetBinContent(event.npvTrue);
           TLorentzVector systemP4 = (*p4_tag) + (*p4_probe);
           mass = systemP4.M();
           if (verbose) printf("\t\tmade a PASSING e-mu pair! pTs %f, %f; system mass %f, total charge %d e\n", p4_tag->Pt(), p4_probe->Pt(), mass, qtag+qprobe);
           electron_pair_tree->Fill();
         }
         // failing probes for muons
-        for(unsigned int iProbe=0; iProbe < p4_mu_failing_probe_.size(); iProbe++) {
+        for(unsigned iProbe=0; iProbe < p4_mu_failing_probe_.size(); iProbe++) {
           pass = 0;
           *p4_tag     = p4_ele_tag_[iTag];  
           *p4_probe   = p4_mu_failing_probe_[iProbe];
@@ -607,7 +605,6 @@ void make_tnp_skim(
           truth_probe  = truth_mu_failing_probe_[iProbe];
           tagPid = -11*q_ele_tag_[iTag];
           probePid = -13*q_mu_failing_probe_[iProbe];
-          if(!real_data) scale1fb = event.weight*puWeights->GetBinContent(event.npvTrue);
           TLorentzVector systemP4 = (*p4_tag) + (*p4_probe);
           mass = systemP4.M();
           if (verbose) printf("\t\tmade a FAILING e-mu pair! pTs %f, %f; system mass %f, total charge %d e\n", p4_tag->Pt(), p4_probe->Pt(), mass, qtag+qprobe);
@@ -618,8 +615,8 @@ void make_tnp_skim(
     }
     //if(do_muons && real_data) { // muon tag electron probe pairs
     if(do_muons) { // muon tag electron probe pairs
-      for(unsigned int iTag=0; iTag < p4_mu_tag_.size(); iTag++) {
-        for (unsigned int iProbe=0; iProbe < p4_ele_passing_probe_.size(); iProbe++) {
+      for(unsigned iTag=0; iTag < p4_mu_tag_.size(); iTag++) {
+        for (unsigned iProbe=0; iProbe < p4_ele_passing_probe_.size(); iProbe++) {
           pass = 1;
           *p4_tag     = p4_mu_tag_[iTag];
           *p4_probe   = p4_ele_passing_probe_[iProbe];
@@ -631,14 +628,14 @@ void make_tnp_skim(
           probePid = -11*q_ele_passing_probe_[iProbe];
           truth_tag    = truth_mu_tag_[iTag];
           truth_probe  = truth_ele_passing_probe_[iProbe];
-          if(!real_data) scale1fb = event.weight*puWeights->GetBinContent(event.npvTrue);
           TLorentzVector systemP4 = (*p4_tag) + (*p4_probe);
           mass = systemP4.M();
+          if(mass<40.||mass>140.) continue;
           if (verbose)
             printf("\t\tmade a PASSING mu-e pair! pTs %f, %f; system mass %f, total charge %d e\n", p4_tag->Pt(), p4_probe->Pt(), mass, qtag+qprobe);
           muon_pair_tree->Fill();
         }
-        for(unsigned int iProbe=0; iProbe < p4_ele_failing_probe_.size(); iProbe++) {
+        for(unsigned iProbe=0; iProbe < p4_ele_failing_probe_.size(); iProbe++) {
           pass = 0;
           *p4_tag     = p4_mu_tag_[iTag];  
           *p4_probe   = p4_ele_failing_probe_[iProbe];
@@ -648,9 +645,9 @@ void make_tnp_skim(
           truth_probe  = truth_ele_failing_probe_[iProbe];
           tagPid = -13*q_mu_tag_[iTag];
           probePid = -11*q_ele_failing_probe_[iProbe];
-          if(!real_data) scale1fb = event.weight*puWeights->GetBinContent(event.npvTrue);
           TLorentzVector systemP4 = (*p4_tag) + (*p4_probe);
           mass = systemP4.M();
+          if(mass<40.||mass>140.) continue;
           if (verbose)
             printf("\t\tmade a FAILING mu-e pair! pTs %f, %f; system mass %f, total charge %d e\n", p4_tag->Pt(), p4_probe->Pt(), mass, qtag+qprobe);
           muon_pair_tree->Fill();
@@ -658,65 +655,172 @@ void make_tnp_skim(
 
       }
     }
-    // Make Lepton-CH pairs if there is no Z candidate in the event.
+    // Make Lepton-CH pairs
     unsigned nZCand=nPassingMuPairs+nFailingMuPairs+nPassingElePairs+nFailingElePairs;
-    //if(nZCand==0 && real_data){
-    if(nZCand==0){
-      UShort_t iPF=0; unsigned pfRangeMax=2084;
-      for(auto& the_vertex : event.vertices)
-        if(the_vertex.pfRangeMax<pfRangeMax && the_vertex.pfRangeMax>0) pfRangeMax=the_vertex.pfRangeMax;
-      for (auto& pfCand : event.pfCandidates) {
-        if(pfCand.ptype != panda::PFCand::hp && pfCand.ptype != panda::PFCand::hm) continue; // only pion/kaon/proton candidates
-        if(iPF >= pfRangeMax) break; // only pf candidates from the primary vertex
-        if(pfCand.pt()<10.) break; // stop after we start getting into the softer candidates
-        if(pfCand.eta()<-2.5 || pfCand.eta()>2.5) continue;
-        probePid=(pfCand.ptype== panda::PFCand::hp)? 211:-211; // PDG code for pi+/pi-.
-        *p4_probe=pfCand.p4();
+    
+    vector<panda::PFCand*> chProbes;
+    vector<bool> chEleProbePass, chEleProbeReco, chMuProbePass, chMuProbeReco;
+    vector<float> chProbeTruths;
+    vector<TLorentzVector> chProbeGenP4s;
+    UShort_t iPF=0; unsigned pfRangeMax=2084;
+    for(auto& the_vertex : event.vertices) if(the_vertex.pfRangeMax<pfRangeMax && the_vertex.pfRangeMax>0) pfRangeMax=the_vertex.pfRangeMax;
+    for (auto& pfCand : event.pfCandidates) {
+      if(iPF >= pfRangeMax) break; // only pf candidates from the primary vertex
+      if(pfCand.pt()<10.) break; // stop after we start getting into the softer candidates
+      if(pfCand.eta()<-2.5 || pfCand.eta()>2.5) continue;
 
-        // Clean the CH of leptons in DR cone 0.3
-        bool chIsBadLepton=false;
-        if (event.muons.size()>0) for (unsigned iM = 0; iM != event.muons.size(); ++iM){
-          if(p4_probe->DeltaR(((panda::Muon)event.muons[iM]).p4())<0.3) {chIsBadLepton=true; break;}
-        } if(chIsBadLepton) continue;
-        if (event.electrons.size()>0) for (unsigned iE = 0; iE != event.electrons.size(); ++iE){
-          if(p4_probe->DeltaR(((panda::Electron)event.electrons[iE]).p4())<0.3) {chIsBadLepton=true; break;}
-        } if(chIsBadLepton) continue;
+      // pf candidate species
+      bool isChargedTrack=true;
+      switch(pfCand.ptype) {
+        case panda::PFCand::hp:
+        case panda::PFCand::ep:
+        case panda::PFCand::mup:
+          probePid=211;
+          qprobe=1;
+          break;
+        case panda::PFCand::hm:
+        case panda::PFCand::em:
+        case panda::PFCand::mum:
+          probePid=-211;
+          qprobe=-1;
+          break;
+        default:
+          isChargedTrack=false;
+          break;
+      }
+      if(!isChargedTrack) continue;
 
-        // Muon tags
-        if(do_muons) for (unsigned int iTag=0; iTag < p4_mu_tag_.size(); iTag++) {
-          pass = 0; // all pf candidates fail lepton ID
-          *p4_tag     = p4_mu_tag_[iTag];
-          qtag    = q_mu_tag_[iTag];
-          qprobe  = (pfCand.ptype== panda::PFCand::hp)? 1:-1;
-          tagPid = -13*q_mu_tag_[iTag];
-          truth_tag    = truth_mu_tag_[iTag];
-          truth_probe  = 0; //dummy
-          if( p4_tag->DeltaR(*p4_probe) < .1) continue;
-          if (!real_data) scale1fb = event.weight*puWeights->GetBinContent(event.npvTrue);
-          TLorentzVector systemP4 = (*p4_tag) + (*p4_probe);
-          mass = systemP4.M();
-          if(mass<40.||mass>140.) continue;
-          if (verbose) printf("\t\tmade a Mu-Pi pair! pTs %f, %f; system mass %f, total charge %d e\n", p4_tag->Pt(), p4_probe->Pt(), mass, qtag+qprobe);
+      bool isChargedHadron = (pfCand.ptype == panda::PFCand::hp || pfCand.ptype == panda::PFCand::hm);
+      *p4_probe=pfCand.p4();
+
+      // Try to match the charged track to a reconstructed electron/muon
+      // If it matches, see if the lepton passes the probe test selection.
+      bool chMatchedToRecoMuon=false, chMatchedToRecoElectron=false;
+      bool chRecoMuonIsPassing=false, chRecoElectronIsPassing=false;
+      if (event.muons.size()>0) for (unsigned iM = 0; iM != event.muons.size(); ++iM){
+        //if(p4_probe->DeltaR(((panda::Muon)event.muons[iM]).p4())<0.3) {chMatchedToRecoMuon=true; break;}
+        if(((panda::Muon)event.muons[iM]).matchedPF.isValid() && ((panda::Muon)event.muons[iM]).matchedPF.get() == &pfCand) {
+          chMatchedToRecoMuon=true;
+          vector<int> passing_ids = passProbe(event.muons[iM], gettagprobe, false);
+          for (unsigned long i = 0; i < passing_ids.size(); i++) if(passing_ids[i]==2) chRecoMuonIsPassing=true;
+        }
+      } 
+      if (event.electrons.size()>0) for (unsigned iE = 0; iE != event.electrons.size(); ++iE){
+        //if(p4_probe->DeltaR(((panda::Electron)event.electrons[iE]).p4())<0.3) {chMatchedToRecoElectron=true; break;}
+        if(((panda::Electron)event.electrons[iE]).matchedPF.isValid() && ((panda::Electron)event.electrons[iE]).matchedPF.get() == &pfCand) {
+          chMatchedToRecoElectron=true;
+          vector<int> passing_ids = passProbe(event.electrons[iE], gettagprobe, false);
+          for (unsigned long i = 0; i < passing_ids.size(); i++) if(passing_ids[i]==2) chRecoElectronIsPassing=true;
+        }
+      } 
+      
+      bool chMatchedToGenMuon=false, chMatchedToGenElectron=false;
+      float chTruth=0, dRCHLepton; 
+      TLorentzVector genP4;
+      if (!real_data && truth_matching) {
+        for (unsigned iG = 0; iG != event.genParticles.size(); ++iG){
+          auto& genParticle = event.genParticles[iG];
+          if (genParticle.finalState != 1) continue;
+          TVector3 genParticle3; genParticle3.SetPtEtaPhi(genParticle.pt(),genParticle.eta(),genParticle.phi());
+          dRCHLepton = genParticle3.DeltaR(pfCand.p4().Vect());
+          if (TMath::Abs(genParticle.pdgid) == 13 && dRCHLepton < truth_matching_dR) {
+            chTruth = TMath::Max(0.001f, dRCHLepton);
+            genP4.SetPtEtaPhiM(genParticle.pt(),genParticle.eta(),genParticle.phi(),0.106);
+            chMatchedToGenMuon=true;
+            break;
+          } else if (TMath::Abs(genParticle.pdgid) == 11 && dRCHLepton < truth_matching_dR) {
+            chTruth = TMath::Max(0.001f, dRCHLepton);
+            genP4.SetPtEtaPhiM(genParticle.pt(),genParticle.eta(),genParticle.phi(),511e-6);
+            chMatchedToGenElectron=true;
+            break;
+          }
+        }
+        if(chTruth==0) continue;
+      }
+      chProbes.push_back(&pfCand);
+      chProbeGenP4s.push_back(genP4);
+      chEleProbeReco.push_back(chMatchedToRecoElectron);
+      chMuProbeReco.push_back(chMatchedToRecoMuon);
+      chEleProbePass.push_back(chMatchedToRecoElectron && chRecoElectronIsPassing);
+      chMuProbePass.push_back(chMatchedToRecoMuon && chRecoMuonIsPassing);
+      chProbeTruths.push_back(chTruth);
+      iPF++;
+    }
+
+    // Make same sign L-Pi pairs; also perform arbitration for the probes
+    // If there is not a passing probe, use the one with the best mass
+    // Muon tags
+    if(do_muons) for (unsigned iTag=0; iTag < p4_mu_tag_.size(); iTag++) {
+      *p4_tag     = p4_mu_tag_[iTag];
+      *genp4_tag  = genp4_mu_tag_[iTag];
+      qtag    = q_mu_tag_[iTag];
+      tagPid = -13*q_mu_tag_[iTag];
+      truth_tag    = truth_mu_tag_[iTag];
+      float bestMuProbeMass, bestMuProbeMassDiff=999; unsigned bestMuProbeIdx=0; bool foundBestMuProbe=false;
+      float bestEleProbeMass, bestEleProbeMassDiff=999; unsigned bestEleProbeIdx=0; bool foundBestEleProbe=false;
+      for(unsigned iCH=0; iCH < chProbes.size(); iCH++) {
+        *p4_probe=chProbes[iCH]->p4(); 
+        *genp4_probe = chProbeGenP4s[iCH];
+        qprobe=(chProbes[iCH]->ptype==panda::PFCand::hp || chProbes[iCH]->ptype==panda::PFCand::ep || chProbes[iCH]->ptype==panda::PFCand::mup)? 1:-1;
+        probePid=211*qprobe;
+        truth_probe  = chProbeTruths[iCH];
+        if( p4_tag->DeltaR(*p4_probe) < .1) continue;
+        TLorentzVector systemP4 = (*p4_tag) + (*p4_probe);
+        mass = systemP4.M();
+        if(mass<40.||mass>140.) continue;
+        if((qtag+qprobe)!=0) {
+          if(nZCand!=0 || chMuProbeReco[iCH] || chEleProbeReco[iCH]) continue; // Z veto
+          pass=0;
+          if (verbose) printf("\t\tmade a Mu-Pi pair! pTs %f, %f; system mass %f, total charge %d e, pass=%d\n", p4_tag->Pt(), p4_probe->Pt(), mass, qtag+qprobe, pass);
           muon_pair_tree->Fill();
+        } else { // arbitration
+          float massDiff = fabs(mass-91.1876);
+          if(!foundBestMuProbe || massDiff<bestMuProbeMassDiff || (chMuProbePass[iCH] && !chMuProbePass[bestMuProbeIdx])) { 
+            bestMuProbeIdx = iCH;
+            bestMuProbeMass=mass;
+            bestMuProbeMassDiff=fabs(mass-91.1876);
+            foundBestMuProbe=true;
+          }
         }
-        //Electron tags
-        if(do_electrons) for (unsigned int iTag=0; iTag < p4_ele_tag_.size(); iTag++) {
-          pass = 0; // all pf candidates fail lepton ID
-          *p4_tag     = p4_ele_tag_[iTag];
-          qtag    = q_ele_tag_[iTag];
-          qprobe  = (pfCand.ptype== panda::PFCand::hp)? 1:-1;
-          tagPid = -11*q_ele_tag_[iTag];
-          truth_tag    = truth_ele_tag_[iTag];
-          truth_probe  = 0; //dummy
-          if( p4_tag->DeltaR(*p4_probe) < .1) continue;
-          if (!real_data) scale1fb = event.weight*puWeights->GetBinContent(event.npvTrue);
-          TLorentzVector systemP4 = (*p4_tag) + (*p4_probe);
-          mass = systemP4.M();
-          if(mass<40.||mass>140.) continue;
-          if (verbose) printf("\t\tmade a Mu-Pi pair! pTs %f, %f; system mass %f, total charge %d e\n", p4_tag->Pt(), p4_probe->Pt(), mass, qtag+qprobe);
+      }
+      // use the best one (passing or arbitrated mass)
+      if(!foundBestMuProbe) continue;
+      panda::PFCand *bestProbe=chProbes[bestMuProbeIdx];
+      *p4_probe=bestProbe->p4();
+      *genp4_probe = chProbeGenP4s[bestMuProbeIdx];
+      truth_probe = chProbeTruths[bestMuProbeIdx];
+      pass=chMuProbePass[bestMuProbeIdx];
+      mass=bestMuProbeMass;
+      qprobe=(bestProbe->ptype==panda::PFCand::hp || bestProbe->ptype==panda::PFCand::ep || bestProbe->ptype==panda::PFCand::mup)? 1:-1;
+      probePid=211*qprobe;
+      if(qprobe+qtag==0 && ((tagPid==13&&probePid==211)||(tagPid==-13&&probePid==-211))) {
+        if (verbose) printf("\t\tmade a Mu-Track pair! pTs %f, %f; system mass %f, total charge %d e\n", p4_tag->Pt(), p4_probe->Pt(), mass, qtag+qprobe);
+        muon_pair_tree->Fill();
+      }
+    }
+    //Electron tags
+    if(do_electrons) for (unsigned iTag=0; iTag < p4_ele_tag_.size(); iTag++) {
+      *p4_tag     = p4_ele_tag_[iTag];
+      *genp4_tag  = genp4_ele_tag_[iTag];
+      qtag    = q_ele_tag_[iTag];
+      tagPid = -13*q_ele_tag_[iTag];
+      truth_tag    = truth_ele_tag_[iTag];
+      for(unsigned iCH=0; iCH < chProbes.size(); iCH++) {
+        *p4_probe=chProbes[iCH]->p4(); 
+        *genp4_probe = chProbeGenP4s[iCH];
+        qprobe=(chProbes[iCH]->ptype==panda::PFCand::hp || chProbes[iCH]->ptype==panda::PFCand::ep || chProbes[iCH]->ptype==panda::PFCand::mup)? 1:-1;
+        probePid=211*qprobe;
+        truth_probe  = chProbeTruths[iCH];
+        if( p4_tag->DeltaR(*p4_probe) < .1) continue;
+        TLorentzVector systemP4 = (*p4_tag) + (*p4_probe);
+        mass = systemP4.M();
+        if(mass<40.||mass>140.) continue;
+        if(qtag+qprobe!=0) {
+          if(nZCand!=0 || chMuProbeReco[iCH] || chEleProbeReco[iCH])  continue;
+          pass=0;
+          if (verbose) printf("\t\tmade an E-Pi pair! pTs %f, %f; system mass %f, total charge %d e\n", p4_tag->Pt(), p4_probe->Pt(), mass, qtag+qprobe);
           electron_pair_tree->Fill();
-        }
-        iPF++;
+        } 
       }
     }
   }

@@ -7,13 +7,15 @@ from argparse import ArgumentParser
 import ROOT
 import subprocess
 ROOT.gROOT.SetBatch(True)
-ROOT.gSystem.Load('libPandaTreeObjects.so')
+#ROOT.gSystem.Load('libPandaTreeObjects.so')
 cmsswBase = os.environ['CMSSW_BASE'];
-os.chdir(cmsswBase+'/src/LeptonExtractor')
+#os.chdir(cmsswBase+'/src/LeptonExtractor')
 ROOT.gROOT.LoadMacro(cmsswBase+'/src/LeptonExtractor/pandaSelection.C+')
 
-CATALOGDIR = '/home/cmsprod/catalog/t2mit/pandaf/005'
-TASKNAME = 'tpskim'
+CATALOGDIR = '/home/cmsprod/catalog/t2mit/pandaf/008'
+#TASKNAME = 'tpskim'
+TASKNAME = 'tpskim_BtoF'
+#TASKNAME = 'tpskim_GtoH'
 
 argParser = ArgumentParser(description = "Parameters for Anaysis")
 argParser.add_argument('task', metavar = 'task',  help = 'Task name.')
@@ -126,11 +128,11 @@ elif args.task == 'skim':
         file_listM = file_listM + os.getcwd() + "/%s " % (name + "_muonTnP.root")
 
     if args.do_electrons:
-        subprocess.call("cd %s/src; cmsenv; hadd -f %s %s"  % (os.environ['CMSSW_BASE'],tmpnameE, file_listE), shell = True)
+        subprocess.call("cd %s/src; source /cvmfs/cms.cern.ch/cmsset_default.sh; eval `scramv1 runtime -sh`; hadd -f %s %s"  % (os.environ['CMSSW_BASE'],tmpnameE, file_listE), shell = True)
         shutil.copy(tmpnameE, finalnameE)
         os.remove(tmpnameE)
 
     if args.do_muons:    
-        subprocess.call("cd %s/src; cmsenv; hadd -f %s %s"  % (os.environ['CMSSW_BASE'],tmpnameM, file_listM), shell = True)
+        subprocess.call("cd %s/src; source /cvmfs/cms.cern.ch/cmsset_default.sh; eval `scramv1 runtime -sh`; hadd -f %s %s"  % (os.environ['CMSSW_BASE'],tmpnameM, file_listM), shell = True)
         shutil.copy(tmpnameM, finalnameM)
         os.remove(tmpnameM)

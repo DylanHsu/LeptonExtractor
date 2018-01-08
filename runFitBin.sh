@@ -13,7 +13,7 @@ origDir=`pwd`
 
 #run
 source /cvmfs/cms.cern.ch/cmsset_default.sh
-cd /home/dhsu/CMSSW_8_0_26_patch1/src
+cd /home/dhsu/CMSSW_8_0_29/src
 eval `scramv1 runtime -sh`
 cd LeptonExtractor
 mkdir -p $outputDir

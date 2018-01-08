@@ -85,7 +85,7 @@ void RocRes::dumpParams(){
 	
 void RocRes::init(std::string filename){
     std::ifstream in(filename.c_str());
-    char tag[4];
+    std::string tag; //char tag[4];
     int type, sys, mem, isdt, var, bin;	
     std::string s;
     while(std::getline(in, s)){
@@ -249,7 +249,7 @@ void RocOne::init(std::string filename, int iTYPE, int iSYS, int iMEM){
     RR.init(filename);
 
     std::ifstream in(filename.c_str());
-    char tag[4];
+    std::string tag; //char tag[4];
     int type, sys, mem, isdt, var, bin;	
 
     bool initialized=false;

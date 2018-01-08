@@ -9,17 +9,22 @@
 #include <iomanip>
 #include <unistd.h>
 
-//const Float_t elePtBins[] = {10,15,20,25, 30, 35, 40, 50, 70, 100, 1000};
-//const Float_t eleEtaBins[] = {-2.5,-2.0,-1.566,-1.4442,-1,-0.5,0,0.5,1,1.4442,1.566,2.0,2.5};
-//const Int_t nElePtBins=10;
-//const Int_t nEleEtaBins=12;
-//const Float_t muPtBins[] = {10,15,20,25,30,35,40,50,70,100,1000};
-//const Float_t muEtaBins[] = {-2.4,-2.1,-1.8,-1.6,-1.3,-1.1,-0.8,-0.6,-0.4,-0.3,-0.2,-0.1,0,0.1,0.2,0.3,0.4,0.6,0.8,1.1,1.3,1.6,1.8,2.1,2.4};
-//const Int_t nMuPtBins=10;
-//const Int_t nMuEtaBins=24;
+//const int nMassBins=200;
+const int nMassBins=50;
+const bool doBtoF=false;
+const bool doGtoH=true;
+enum massSelType {
+  kZll, 
+  kEM, 
+  kZeeSameSign, 
+  kZmmSameSign, 
+  kMuPi, 
+  kEPi,
+  kZMuMuFromTrack,
+  kGenZll, 
+  knSelTypes
+};
 
-// Selection: Zll | em | e+e+ | m+m+ | pm | pe
-enum massSelType { kZll, kEM, kZeeSameSign, kZmmSameSign, kMuPi, kEPi, kGenZll, knSelTypes};
 void binSplitter(
   TString inputFileName, 
   TString outputFileName, 
@@ -92,13 +97,14 @@ void binSplitter(
   TLorentzVector *tag=0, *probe=0;        // tag, probe 4-vector
   TLorentzVector *genp4_tag=0, *genp4_probe=0;        // tag, probe 4-vector
   
-  //inputTree->SetBranchAddress("runNum",   &runNum);
+  if(!isMC) inputTree->SetBranchAddress("runNum",   &runNum);
   //inputTree->SetBranchAddress("lumiSec",  &lumiSec);
   //inputTree->SetBranchAddress("evtNum",   &evtNum);
   inputTree->SetBranchAddress("npv",      &npv);
   inputTree->SetBranchAddress("pass",     &pass);
   //inputTree->SetBranchAddress("npu",      &npu);
-  inputTree->SetBranchAddress("scale1fb", &scale1fb);
+  if(isMC) inputTree->SetBranchAddress("scale1fb", &scale1fb);
+  else     inputTree->SetBranchStatus("scale1fb",0);
   inputTree->SetBranchAddress("mass",     &mass);
   inputTree->SetBranchAddress("qtag",     &qtag);
   inputTree->SetBranchAddress("qprobe",   &qprobe);
@@ -106,8 +112,13 @@ void binSplitter(
   inputTree->SetBranchAddress("probePid",   &probePid);
   inputTree->SetBranchAddress("tag",      &tag);
   inputTree->SetBranchAddress("probe",    &probe);
-  if(selection==kGenZll) inputTree->SetBranchAddress("genTag",      &genp4_tag);
-  if(selection==kGenZll) inputTree->SetBranchAddress("genProbe",    &genp4_probe);
+  if(selection==kGenZll || selection==kZMuMuFromTrack) {
+    inputTree->SetBranchAddress("genTag",      &genp4_tag);
+    inputTree->SetBranchAddress("genProbe",    &genp4_probe);
+  } else {
+    inputTree->SetBranchStatus("genTag",0);
+    inputTree->SetBranchStatus("genProbe",0);
+  }
   //inputTree->SetBranchAddress("met",      &met);
   //inputTree->SetBranchAddress("njets",    &njets);
   
@@ -118,9 +129,9 @@ void binSplitter(
   for(unsigned iPt=0;iPt<fPtBinEdgesv.size()-1; iPt++) { for(unsigned iEta=0; iEta<fEtaBinEdgesv.size()-1; iEta++) {
     char histName[256];
     sprintf(histName,"pass_ptBin%d_etaBin%d", iPt, iEta);
-    histosPass[iHisto] = new TH1D(histName,histName,50,40,140);
+    histosPass[iHisto] = new TH1D(histName,histName,nMassBins,40,140);
     sprintf(histName,"fail_ptBin%d_etaBin%d", iPt, iEta);
-    histosFail[iHisto] = new TH1D(histName,histName,50,40,140);
+    histosFail[iHisto] = new TH1D(histName,histName,nMassBins,40,140);
     iHisto++;
   }}
   int iHistoMax=iHisto-1;
@@ -128,23 +139,38 @@ void binSplitter(
   assert(!isMC || sum_weights);
   
   for(unsigned int ientry=0; ientry<(unsigned int)inputTree->GetEntries(); ientry++) {
-    inputTree->GetEntry(ientry);
     if(ientry%1000000==0) printf("reading entry %d/%d\n",ientry,(unsigned int)inputTree->GetEntries());
-    if(mass<40.||mass>=140.) continue;
+
+    if(!isMC) {
+      inputTree->GetBranch("runNum")->GetEntry(ientry);
+      if(doBtoF && runNum>=278803) continue; // before HIP problem fixed
+      if(doGtoH && runNum<278803) continue; // after HIP problem fixed
+    }
+
     bool passSelection=false;
-    if     (selection==         kZll ) passSelection=(tagPid+probePid==0 && (tagPid==13||tagPid==-13||tagPid==11||tagPid==-11));
-    else if(selection==      kGenZll ) passSelection=(tagPid+probePid==0 && (tagPid==13||tagPid==-13||tagPid==11||tagPid==-11));
-    else if(selection==          kEM ) passSelection=((TMath::Abs(tagPid)==13 && TMath::Abs(probePid)==11)||(TMath::Abs(tagPid)==11 && TMath::Abs(probePid==13)))&&(tag->Pt()>=30.);
-    else if(selection== kZeeSameSign ) passSelection=(tagPid==11&&probePid==11)||(tagPid==-11&&probePid==-11);
-    else if(selection== kZmmSameSign ) passSelection=(tagPid==13&&probePid==13)||(tagPid==-13&&probePid==-13);
-    else if(selection==        kMuPi ) passSelection=(tagPid==13&&probePid==-211)||(tagPid==-13&&probePid==211);
-    else if(selection==         kEPi ) passSelection=(tagPid==11&&probePid==-211)||(tagPid==-11&&probePid==211);
-    else                               passSelection=false;
+    inputTree->GetBranch("tagPid")->GetEntry(ientry);
+    inputTree->GetBranch("probePid")->GetEntry(ientry);
+    inputTree->GetBranch("tag")->GetEntry(ientry);
+    if     (selection==           kZll ) passSelection=(tagPid+probePid==0 && (tagPid==13||tagPid==-13||tagPid==11||tagPid==-11));
+    else if(selection==        kGenZll ) passSelection=(tagPid+probePid==0 && (tagPid==13||tagPid==-13||tagPid==11||tagPid==-11));
+    else if(selection==            kEM ) passSelection=((TMath::Abs(tagPid)==13 && TMath::Abs(probePid)==11)||(TMath::Abs(tagPid)==11 && TMath::Abs(probePid==13)))&&(tag->Pt()>=30.);
+    else if(selection==   kZeeSameSign ) passSelection=(tagPid==11&&probePid==11)||(tagPid==-11&&probePid==-11);
+    else if(selection==   kZmmSameSign ) passSelection=(tagPid==13&&probePid==13)||(tagPid==-13&&probePid==-13);
+    else if(selection==          kMuPi ) passSelection=(tagPid==13&&probePid==-211)||(tagPid==-13&&probePid==211);
+    else if(selection==           kEPi ) passSelection=(tagPid==11&&probePid==-211)||(tagPid==-11&&probePid==211);
+    else if(selection== kZMuMuFromTrack) passSelection=(tagPid==13&&probePid==211)||(tagPid==-13&&probePid==-211); //mu- & track+ or track+ & mu-
+    else                                 passSelection=false;
     if(alt_tag) passSelection &= (
       ((tagPid==13||tagPid==-13) && tag->Pt()>30 && (tag->Eta()<2.1||tag->Eta()>-2.1)) ||
       ((tagPid==11||tagPid==-11) && tag->Pt()>35 && (tag->Eta()<2.1||tag->Eta()>-2.1))
     );
     if(!passSelection) continue;
+    inputTree->GetEntry(ientry);
+    if(mass<40.||mass>=140.) continue;
+    if(selection == kZMuMuFromTrack && isMC) {
+      float probeGenRecoBalance = fabs(genp4_probe->Pt() / probe->Pt() - 1.);
+      if(probeGenRecoBalance > 0.1) continue;
+    }
     iHisto=0;
     bool ignoreEtaHighEnergy=(selection==kMuPi || selection==kEPi || selection==kEM);
     bool ignorePassFlag=(selection==kMuPi || selection==kEPi || selection==kEM);
@@ -158,8 +184,8 @@ void binSplitter(
           if(isMC) weight = scale1fb / sum_weights->GetBinContent(1) * scalefactor;
           else     weight = 1;
           if(selection==kGenZll) { TLorentzVector genDilep = (*genp4_tag) + (*genp4_probe); mass=genDilep.M(); }
-          if(pass  || ignorePassFlag) histosPass[iHisto]->Fill(mass,weight);
-          if(!pass || ignorePassFlag) histosFail[iHisto]->Fill(mass,weight);
+          if     (pass  || ignorePassFlag) histosPass[iHisto]->Fill(mass,weight);
+          else if(!pass || ignorePassFlag) histosFail[iHisto]->Fill(mass,weight);
         }
       }
       iHisto++;
@@ -170,7 +196,17 @@ void binSplitter(
   outputFile->Close();
 }
 
-void generateJobArgs(string outDir, std::string binFile, string flavor="electrons") {
+void generateJobArgs(
+  string outDir,
+  std::string binFile,
+  string flavor="electrons",
+  string signalModel="fitterShape::kTemplateConvGaus",
+  string bkgModel="fitterShape::kBkgTwoTemplates",
+  string dataTemplates="SingleElectron2016_BaselineToMedium_ScaleSmearCorrections_electronTnP_binnedHistos.root",
+  string mcTemplates="DYJetsToLL_BaselineToMedium_ScaleSmearCorrections_PtBinnedPlusInclusiveNLO_electronTnP_binnedHistos.root",
+  string bkgTemplate1="\"\"",
+  string bkgTemplate2="\"\""
+) {
   // parse bin file
   std::vector<double> fPtBinEdgesv, fEtaBinEdgesv, fPhiBinEdgesv, fNPVBinEdgesv, fJetsBinEdgesv, fMETBinEdgesv;
   // flags for |eta| and |phi| binning
@@ -229,19 +265,27 @@ void generateJobArgs(string outDir, std::string binFile, string flavor="electron
     titleStringFail.ReplaceAll(" ","~");
     ofs
       << outDir.c_str() 
-      << Form(" pass_ptBin%d_etaBin%d",iPt,iEta)
-      << ((flavor=="muons")? Form(" %s/SingleMuon2016_BaselineToMedium_RochesterCorrections_muonTnP_binnedHistos.root",outDir.c_str())                      : Form(" %s/SingleElectron2016_BaselineToMedium_ScaleSmearCorrections_electronTnP_binnedHistos.root",outDir.c_str()))
-      << ((flavor=="muons")? Form(" %s/DYJetsToLL_BaselineToMedium_RochesterCorrections_PtBinnedPlusInclusiveNLO_muonTnP_binnedHistos.root",outDir.c_str()) : Form(" %s/DYJetsToLL_BaselineToMedium_ScaleSmearCorrections_PtBinnedPlusInclusiveNLO_electronTnP_binnedHistos.root",outDir.c_str()))
-      << " fitterShape::kTemplateConvGaus fitterShape::kBkgDasPlusExp " 
+      << Form(" pass_ptBin%d_etaBin%d ",iPt,iEta)
+      << Form(" %s ", dataTemplates.c_str())
+      << Form(" %s ", mcTemplates.c_str())
+      << Form(" %s ", bkgTemplate1.c_str())
+      << Form(" %s ", bkgTemplate2.c_str())
+      << Form(" %s ", signalModel.c_str())
+      << Form(" %s ", bkgModel.c_str())
       << titleStringPass.Data() 
+      << " \"\" \"\""
       << std::endl;
     ofs
       << outDir.c_str() 
       << Form(" fail_ptBin%d_etaBin%d",iPt,iEta)
-      << ((flavor=="muons")? Form(" %s/SingleMuon2016_BaselineToMedium_RochesterCorrections_muonTnP_binnedHistos.root",outDir.c_str())                      : Form(" %s/SingleElectron2016_BaselineToMedium_ScaleSmearCorrections_electronTnP_binnedHistos.root",outDir.c_str()))
-      << ((flavor=="muons")? Form(" %s/DYJetsToLL_BaselineToMedium_RochesterCorrections_PtBinnedPlusInclusiveNLO_muonTnP_binnedHistos.root",outDir.c_str()) : Form(" %s/DYJetsToLL_BaselineToMedium_ScaleSmearCorrections_PtBinnedPlusInclusiveNLO_electronTnP_binnedHistos.root",outDir.c_str()))
-      << " fitterShape::kTemplateConvGaus fitterShape::kBkgDasPlusExp " 
-      << titleStringFail.Data() 
+      << Form(" %s ", dataTemplates.c_str())
+      << Form(" %s ", mcTemplates.c_str())
+      << Form(" %s ", bkgTemplate1.c_str())
+      << Form(" %s ", bkgTemplate2.c_str())
+      << Form(" %s ", signalModel.c_str())
+      << Form(" %s ", bkgModel.c_str())
+      << titleStringPass.Data() 
+      << " \"\" \"\""
       << std::endl;
   }}
 

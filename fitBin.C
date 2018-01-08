@@ -108,8 +108,13 @@ RooFitResult *fitBin(
   switch(signalModel) {
     case kTemplateConvDas    : sigFitterShape=new fitterShape::templateConvDas(m,sigTemplateHist); break;
     case kTemplateConvGaus   : sigFitterShape=new fitterShape::templateConvGaus(m,sigTemplateHist); break;
+    case kTemplateConvDoubleGaus   : sigFitterShape=new fitterShape::templateConvDoubleGaus(m,sigTemplateHist); break;
     case kTemplateBWConvGaus : sigFitterShape=new fitterShape::templateBWConvGaus(m,sigTemplateHist); break;
     case kBreitWignerConvDas : sigFitterShape=new fitterShape::breitWignerConvDas(m); break;
+    case kTemplateConvLandau   : sigFitterShape=new fitterShape::templateConvLandau(m,sigTemplateHist); break;
+    case kTemplateConvCrystalBall   : sigFitterShape=new fitterShape::templateConvCrystalBall(m,sigTemplateHist); break;
+    case kTemplateConvBeta   : sigFitterShape=new fitterShape::templateConvBeta(m,sigTemplateHist); break;
+
     default                  : printf("Unsupported signal model\n"); assert(0); break;
   }
   switch(bkgModel) {
@@ -161,7 +166,7 @@ RooFitResult *fitBin(
    peakEstimator->SetParameter(0,.9*Ndata); peakEstimator->SetParLimits(0, 1,Ndata);
    peakEstimator->SetParameter(1,91); peakEstimator->SetParLimits(1, 86.1876, 96.1876);
    peakEstimator->SetParameter(0, 1); peakEstimator->SetParLimits(2, 0.001,10);
-   if(signalModel==kTemplateConvDas||signalModel==kTemplateConvGaus||signalModel==kTemplateBWConvGaus||signalModel==kBreitWignerConvDas) {
+   if(signalModel==kTemplateConvDas||signalModel==kTemplateConvGaus||signalModel==kTemplateConvDoubleGaus||signalModel==kTemplateBWConvGaus||signalModel==kBreitWignerConvDas||signalModel==kTemplateConvLandau||signalModel==kTemplateConvCrystalBall||signalModel==kTemplateConvBeta) {
     //TODO: estimate this with a cheap gaussian or pol2 fit in small zmass window
     //double peakPos=dataHist->GetBinCenter(dataHist->GetMaximumBin());
     //double mcPeakPos=sigTemplateHist->GetBinCenter(dataHist->GetMaximumBin());
@@ -170,7 +175,7 @@ RooFitResult *fitBin(
     double peakPos=peakEstimator->GetParameter(1);
     double peakSigma=peakEstimator->GetParameter(2);
     double mcPeakPos, mcPeakSigma;
-    if(signalModel==kTemplateConvDas||signalModel==kTemplateConvGaus||signalModel==kTemplateBWConvGaus) {
+    if(signalModel==kTemplateConvDas||signalModel==kTemplateConvGaus||signalModel==kTemplateConvDoubleGaus||signalModel==kTemplateBWConvGaus||signalModel==kTemplateConvLandau||signalModel==kTemplateConvCrystalBall||signalModel==kTemplateConvBeta) {
      printf("\nPerforming MC peak estimation\n\n");
      sigTemplateHist->Fit(peakEstimator, "MN0", "goff", 86.2, 96.2);
      mcPeakPos=peakEstimator->GetParameter(1);
@@ -192,7 +197,18 @@ RooFitResult *fitBin(
       ((fitterShape::templateConvGaus*)sigFitterShape)->mean->setVal(peakPos-mcPeakPos);
       ((fitterShape::templateConvGaus*)sigFitterShape)->sigma->setRange(0.5*sigmaEst,1.5*sigmaEst);
       ((fitterShape::templateConvGaus*)sigFitterShape)->sigma->setVal(sigmaEst);
-     } else if(signalModel==kTemplateBWConvGaus) {
+     } 
+     else if(signalModel==kTemplateConvDoubleGaus) {
+       ((fitterShape::templateConvDoubleGaus*)sigFitterShape)->mean1->setRange(meanEst-2.,meanEst+2.);
+       ((fitterShape::templateConvDoubleGaus*)sigFitterShape)->mean1->setVal(peakPos-mcPeakPos);
+       ((fitterShape::templateConvDoubleGaus*)sigFitterShape)->sigma1->setRange(0.5*sigmaEst,1.5*sigmaEst);
+       ((fitterShape::templateConvDoubleGaus*)sigFitterShape)->sigma1->setVal(sigmaEst);
+       ((fitterShape::templateConvDoubleGaus*)sigFitterShape)->mean2->setRange(meanEst-3,meanEst+3);
+       ((fitterShape::templateConvDoubleGaus*)sigFitterShape)->mean2->setVal(peakPos-mcPeakPos-1);
+       ((fitterShape::templateConvDoubleGaus*)sigFitterShape)->sigma2->setRange(0.5*sigmaEst,1.5*sigmaEst);
+       ((fitterShape::templateConvDoubleGaus*)sigFitterShape)->sigma2->setVal(sigmaEst);
+
+     }else if(signalModel==kTemplateBWConvGaus) {
       ((fitterShape::templateBWConvGaus*)sigFitterShape)->mean->setRange(meanEst-2.,meanEst+2.);
       ((fitterShape::templateBWConvGaus*)sigFitterShape)->mean->setVal(meanEst);
       ((fitterShape::templateBWConvGaus*)sigFitterShape)->sigma->setRange(0.5*sigmaEst,1.5*sigmaEst);
@@ -202,7 +218,26 @@ RooFitResult *fitBin(
       ((fitterShape::breitWignerConvDas*)sigFitterShape)->mean->setVal(meanEst);
       ((fitterShape::breitWignerConvDas*)sigFitterShape)->sigma->setRange(0.5*sigmaEst,1.5*sigmaEst);
       ((fitterShape::breitWignerConvDas*)sigFitterShape)->sigma->setVal(sigmaEst);
-     }
+     } else if(signalModel==kTemplateConvLandau) {
+       ((fitterShape::templateConvLandau*)sigFitterShape)->mean->setRange(meanEst-2.,meanEst+2.);
+       ((fitterShape::templateConvLandau*)sigFitterShape)->mean->setVal(peakPos-mcPeakPos);
+       ((fitterShape::templateConvLandau*)sigFitterShape)->sigma->setRange(0.5*sigmaEst,1.5*sigmaEst);
+       ((fitterShape::templateConvLandau*)sigFitterShape)->sigma->setVal(sigmaEst);
+     }else if(signalModel==kTemplateConvCrystalBall) {
+       ((fitterShape::templateConvCrystalBall*)sigFitterShape)->mean->setRange(meanEst-2.,meanEst+2.);
+       ((fitterShape::templateConvCrystalBall*)sigFitterShape)->mean->setVal(peakPos-mcPeakPos);
+       ((fitterShape::templateConvCrystalBall*)sigFitterShape)->sigma->setRange(0.5*sigmaEst,1.5*sigmaEst);
+       ((fitterShape::templateConvCrystalBall*)sigFitterShape)->sigma->setVal(sigmaEst);
+       ((fitterShape::templateConvCrystalBall*)sigFitterShape)->a->setRange(meanEst-2.,meanEst+2.);
+       ((fitterShape::templateConvCrystalBall*)sigFitterShape)->a->setVal(peakPos-mcPeakPos);
+       ((fitterShape::templateConvCrystalBall*)sigFitterShape)->n->setRange(0.5*sigmaEst,1.5*sigmaEst);
+       ((fitterShape::templateConvCrystalBall*)sigFitterShape)->n->setVal(sigmaEst);
+     }else if(signalModel==kTemplateConvBeta) {
+       ((fitterShape::templateConvBeta*)sigFitterShape)->a->setRange(meanEst-2.,meanEst+2.);
+       ((fitterShape::templateConvBeta*)sigFitterShape)->a->setVal(peakPos-mcPeakPos);
+       ((fitterShape::templateConvBeta*)sigFitterShape)->b->setRange(0.5*sigmaEst,1.5*sigmaEst);
+       ((fitterShape::templateConvBeta*)sigFitterShape)->b->setVal(sigmaEst);
+       }
    }}
    //delete bkgEstimator;
    delete peakEstimator;
@@ -304,7 +339,6 @@ RooFitResult *fitBin(
   fitResult->printStream(fitResultFile,RooPrintable::kValue,RooPrintable::kVerbose);
   fitResultFile << endl;
   ios_base::fmtflags flags = fitResultFile.flags();
- 
   // Combined errors and goodness-of-fit test
   TH1D *dataHistWithCombErrors=(TH1D*)dataHist->Clone("dataHistWithCombErrors"); dataHistWithCombErrors->SetDirectory(0);
   TH1D *ratioDataPdf=(TH1D*)dataHist->Clone("ratioDataPdf"); ratioDataPdf->SetDirectory(0); ratioDataPdf->Scale(0); ratioDataPdf->Clear();
