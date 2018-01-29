@@ -10,6 +10,8 @@
 #include "RoccoR.cc"
 #include <TRandom3.h>
 
+const float massForArbitration=91.1876;
+
 struct leptonVariables {
   int tag_id            = 6; 
   int tag_iso           = 6; 
@@ -62,14 +64,16 @@ void make_tnp_skim(
     out_evtNum,
     out_npv, // number of primary vertices
     pass; // whether probe passes requirements
-  float        npu=1;                     // mean number of expected pileup
-  float        scale1fb=1;                  // event weight per 1/fb
-  float        mass;                      // tag-probe mass
-  int          qtag, qprobe;              // tag, probe charge
-  float        truth_tag, truth_probe;              // tag, probe truth
-  float        met;                             // missing ET
-  int          njets;                           // number of jets
-  int          tagPid,probePid; // particle ID
+  float         npu=1;                     // mean number of expected pileup
+  float         scale1fb=1;                // event weight per 1/fb
+  float         mass;                      // tag-probe mass
+  char          qtag, qprobe;              // tag, probe charge
+  float         truth_tag, truth_probe;    // tag, probe truth
+  float         met;                       // missing ET
+  unsigned char njets;                     // number of jets
+  short         tagPid ,probePid;          // particle ID
+  unsigned char probeMultiplicity;
+  bool          bestMass;
   TLorentzVector *p4_tag=0, *p4_probe=0;        // tag, probe 4-vector 
   TLorentzVector *genp4_tag=0, *genp4_probe=0;        // tag, probe 4-vector at generator level
 
@@ -98,14 +102,16 @@ void make_tnp_skim(
     electron_pair_tree->Branch("npu",      &npu,      "npu/F"      );  
     electron_pair_tree->Branch("scale1fb", &scale1fb, "scale1fb/F" );
     electron_pair_tree->Branch("mass",     &mass,     "mass/F"     );  
-    electron_pair_tree->Branch("qtag",     &qtag,     "qtag/I"     );  
-    electron_pair_tree->Branch("qprobe",   &qprobe,   "qprobe/I"   );  
-    electron_pair_tree->Branch("njets",    &njets,    "njets/I"   );  
+    electron_pair_tree->Branch("qtag",     &qtag,     "qtag/B"     );  
+    electron_pair_tree->Branch("qprobe",   &qprobe,   "qprobe/B"   );  
+    electron_pair_tree->Branch("njets",    &njets,    "njets/b"   );  
     electron_pair_tree->Branch("met",      &met,      "met/F"   );  
     electron_pair_tree->Branch("tag",   "TLorentzVector", &p4_tag   );  
     electron_pair_tree->Branch("probe", "TLorentzVector", &p4_probe );          
-    electron_pair_tree->Branch("tagPid",      &tagPid,      "tagPid/I"   );  
-    electron_pair_tree->Branch("probePid",      &probePid,      "probePid/I"   );  
+    electron_pair_tree->Branch("tagPid",      &tagPid,      "tagPid/S"   );  
+    electron_pair_tree->Branch("probePid",      &probePid,      "probePid/S"   );  
+    electron_pair_tree->Branch("probeMultiplicity",    &probeMultiplicity,    "probeMultiplicity/b"   );  
+    electron_pair_tree->Branch("bestMass",             &bestMass         ,    "bestMass/O"            );  
     if(!real_data) {
       electron_pair_tree->Branch("truth_tag",     &truth_tag,     "truth_tag/F"     );  
       electron_pair_tree->Branch("truth_probe",   &truth_probe,   "truth_probe/F"   );
@@ -126,14 +132,16 @@ void make_tnp_skim(
     muon_pair_tree->Branch("npu",      &npu,      "npu/F"      );  
     muon_pair_tree->Branch("scale1fb", &scale1fb, "scale1fb/F" );
     muon_pair_tree->Branch("mass",     &mass,     "mass/F"     );  
-    muon_pair_tree->Branch("qtag",     &qtag,     "qtag/I"     );  
-    muon_pair_tree->Branch("qprobe",   &qprobe,   "qprobe/I"   );  
+    muon_pair_tree->Branch("qtag",     &qtag,     "qtag/B"     );  
+    muon_pair_tree->Branch("qprobe",   &qprobe,   "qprobe/B"   );  
     muon_pair_tree->Branch("tag",   "TLorentzVector", &p4_tag   );  
     muon_pair_tree->Branch("probe", "TLorentzVector", &p4_probe );      
-    muon_pair_tree->Branch("njets",    &njets,    "njets/I"   );  
+    muon_pair_tree->Branch("njets",    &njets,    "njets/b"   );  
     muon_pair_tree->Branch("met",      &met,      "met/F"   );  
-    muon_pair_tree->Branch("tagPid",      &tagPid,      "tagPid/I"   );  
-    muon_pair_tree->Branch("probePid",      &probePid,      "probePid/I"   );  
+    muon_pair_tree->Branch("tagPid",   &tagPid,   "tagPid/S"   );  
+    muon_pair_tree->Branch("probePid", &probePid, "probePid/S"   );  
+    muon_pair_tree->Branch("probeMultiplicity",    &probeMultiplicity,    "probeMultiplicity/b"   );  
+    muon_pair_tree->Branch("bestMass",             &bestMass         ,    "bestMass/O"            );  
     if(!real_data) {
       muon_pair_tree->Branch("genTag",   "TLorentzVector", &genp4_tag   );  
       muon_pair_tree->Branch("genProbe", "TLorentzVector", &genp4_probe );      
@@ -575,7 +583,6 @@ void make_tnp_skim(
     }
     
     // Make e-mu pairs
-    //if(do_electrons && real_data) { // electron tag muon probe pairs
     if(do_electrons) { // electron tag muon probe pairs
       for(unsigned iTag=0; iTag < p4_ele_tag_.size(); iTag++) {
         // passing probes for muons
@@ -613,7 +620,6 @@ void make_tnp_skim(
 
       }
     }
-    //if(do_muons && real_data) { // muon tag electron probe pairs
     if(do_muons) { // muon tag electron probe pairs
       for(unsigned iTag=0; iTag < p4_mu_tag_.size(); iTag++) {
         for (unsigned iProbe=0; iProbe < p4_ele_passing_probe_.size(); iProbe++) {
@@ -655,9 +661,13 @@ void make_tnp_skim(
 
       }
     }
-    // Make Lepton-CH pairs
+    
+    //////////////////////////
+    // Make Lepton-CH pairs //
+    //////////////////////////
     unsigned nZCand=nPassingMuPairs+nFailingMuPairs+nPassingElePairs+nFailingElePairs;
     
+    // First, assemble the collection of CH probes
     vector<panda::PFCand*> chProbes;
     vector<bool> chEleProbePass, chEleProbeReco, chMuProbePass, chMuProbeReco;
     vector<float> chProbeTruths;
@@ -666,7 +676,7 @@ void make_tnp_skim(
     for(auto& the_vertex : event.vertices) if(the_vertex.pfRangeMax<pfRangeMax && the_vertex.pfRangeMax>0) pfRangeMax=the_vertex.pfRangeMax;
     for (auto& pfCand : event.pfCandidates) {
       if(iPF >= pfRangeMax) break; // only pf candidates from the primary vertex
-      if(pfCand.pt()<10.) break; // stop after we start getting into the softer candidates
+      if(pfCand.pt()<3.) break; // stop after we start getting into the softer candidates
       if(pfCand.eta()<-2.5 || pfCand.eta()>2.5) continue;
 
       // pf candidate species
@@ -745,10 +755,9 @@ void make_tnp_skim(
       chMuProbePass.push_back(chMatchedToRecoMuon && chRecoMuonIsPassing);
       chProbeTruths.push_back(chTruth);
       iPF++;
-    }
-
+    } // Done assembling the collection of CH probes
+    
     // Make same sign L-Pi pairs; also perform arbitration for the probes
-    // If there is not a passing probe, use the one with the best mass
     // Muon tags
     if(do_muons) for (unsigned iTag=0; iTag < p4_mu_tag_.size(); iTag++) {
       *p4_tag     = p4_mu_tag_[iTag];
@@ -756,47 +765,70 @@ void make_tnp_skim(
       qtag    = q_mu_tag_[iTag];
       tagPid = -13*q_mu_tag_[iTag];
       truth_tag    = truth_mu_tag_[iTag];
-      float bestMuProbeMass, bestMuProbeMassDiff=999; unsigned bestMuProbeIdx=0; bool foundBestMuProbe=false;
-      float bestEleProbeMass, bestEleProbeMassDiff=999; unsigned bestEleProbeIdx=0; bool foundBestEleProbe=false;
-      for(unsigned iCH=0; iCH < chProbes.size(); iCH++) {
+      float bestProbeMass, bestProbeMassDiff=999; unsigned bestProbeIdx=0; bool foundBestProbe=false;
+      vector<float> chPairMass; chPairMass.reserve(chProbes.size());
+      vector<bool> chPairOppositeSign; chPairOppositeSign.reserve(chProbes.size());
+      
+      // We have to loop over the probes completely twice
+      // This first loop computes the pair masses and the probe multiplicity
+      probeMultiplicity=0; 
+      for(unsigned iCH=0; iCH < chProbes.size(); iCH++) { 
+        *p4_probe=chProbes[iCH]->p4(); 
+        *genp4_probe = chProbeGenP4s[iCH];
+        TLorentzVector systemP4 = (*p4_tag) + (*p4_probe);
+        mass = systemP4.M();
+        chPairMass.push_back(mass);
+        if((qtag+qprobe)!=0) continue;
+        if( p4_tag->DeltaR(*p4_probe) < .05) continue;
+        if(mass<60.) continue;
+        // Here there should be a check on the difference between Vertex Z's, but for now we only use CH from the PV
+        probeMultiplicity++;
+        // Check if this is the pair with the mass closest to the Z mass
+        float massDiff = fabs(mass-massForArbitration);
+        if(!foundBestProbe || massDiff<bestProbeMassDiff) { 
+          bestProbeIdx = iCH;
+          bestProbeMass=mass;
+          bestProbeMassDiff=massDiff;
+          foundBestProbe=true;
+        }
+      }
+      
+      // Now that we know the probe multiplicity, store the Mu-Pi Pairs
+      for(unsigned iCH=0; iCH < chProbes.size(); iCH++) { 
+        mass=chPairMass[iCH];
+        if(mass<40.||mass>140.) continue;
         *p4_probe=chProbes[iCH]->p4(); 
         *genp4_probe = chProbeGenP4s[iCH];
         qprobe=(chProbes[iCH]->ptype==panda::PFCand::hp || chProbes[iCH]->ptype==panda::PFCand::ep || chProbes[iCH]->ptype==panda::PFCand::mup)? 1:-1;
         probePid=211*qprobe;
         truth_probe  = chProbeTruths[iCH];
-        if( p4_tag->DeltaR(*p4_probe) < .1) continue;
-        TLorentzVector systemP4 = (*p4_tag) + (*p4_probe);
-        mass = systemP4.M();
-        if(mass<40.||mass>140.) continue;
-        if((qtag+qprobe)!=0) {
+        pass=0;
+        if((qtag+qprobe)!=0) { // Handle Same-Sign Mu-Pi Pairs
           if(nZCand!=0 || chMuProbeReco[iCH] || chEleProbeReco[iCH]) continue; // Z veto
-          pass=0;
-          if (verbose) printf("\t\tmade a Mu-Pi pair! pTs %f, %f; system mass %f, total charge %d e, pass=%d\n", p4_tag->Pt(), p4_probe->Pt(), mass, qtag+qprobe, pass);
+          if (verbose) printf("\t\tmade a Same Sign Mu Track pair! pTs %f, %f; system mass %f, total charge %d e, pass=%d\n", p4_tag->Pt(), p4_probe->Pt(), mass, qtag+qprobe, pass);
           muon_pair_tree->Fill();
-        } else { // arbitration
-          float massDiff = fabs(mass-91.1876);
-          if(!foundBestMuProbe || massDiff<bestMuProbeMassDiff || (chMuProbePass[iCH] && !chMuProbePass[bestMuProbeIdx])) { 
-            bestMuProbeIdx = iCH;
-            bestMuProbeMass=mass;
-            bestMuProbeMassDiff=fabs(mass-91.1876);
-            foundBestMuProbe=true;
-          }
+        } else { // Handle Opposite Sign Mu-Pi Pairs
+          bestMass = (bestProbeIdx==iCH);
+          if(chEleProbePass[iCH]) pass |= 1<<11;
+          if(chMuProbePass[iCH])  pass |= 1<<13;
+          if (verbose) printf("\t\tmade an Opposite Sign Mu Track pair! pTs %f, %f; system mass %f, total charge %d e\n", p4_tag->Pt(), p4_probe->Pt(), mass, qtag+qprobe);
+          muon_pair_tree->Fill();
         }
       }
-      // use the best one (passing or arbitrated mass)
-      if(!foundBestMuProbe) continue;
-      panda::PFCand *bestProbe=chProbes[bestMuProbeIdx];
-      *p4_probe=bestProbe->p4();
-      *genp4_probe = chProbeGenP4s[bestMuProbeIdx];
-      truth_probe = chProbeTruths[bestMuProbeIdx];
-      pass=chMuProbePass[bestMuProbeIdx];
-      mass=bestMuProbeMass;
-      qprobe=(bestProbe->ptype==panda::PFCand::hp || bestProbe->ptype==panda::PFCand::ep || bestProbe->ptype==panda::PFCand::mup)? 1:-1;
-      probePid=211*qprobe;
-      if(qprobe+qtag==0 && ((tagPid==13&&probePid==211)||(tagPid==-13&&probePid==-211))) {
-        if (verbose) printf("\t\tmade a Mu-Track pair! pTs %f, %f; system mass %f, total charge %d e\n", p4_tag->Pt(), p4_probe->Pt(), mass, qtag+qprobe);
-        muon_pair_tree->Fill();
-      }
+      // Now store all opposite sign Mu-Pi pairs, but take note of the probe multiplicity per tag and mark the pair that has the "best mass"
+      //if(!foundBestMuProbe) continue;
+      //panda::PFCand *bestProbe=chProbes[bestMuProbeIdx];
+      //*p4_probe=bestProbe->p4();
+      //*genp4_probe = chProbeGenP4s[bestMuProbeIdx];
+      //truth_probe = chProbeTruths[bestMuProbeIdx];
+      //pass=chMuProbePass[bestMuProbeIdx];
+      //mass=bestMuProbeMass;
+      //qprobe=(bestProbe->ptype==panda::PFCand::hp || bestProbe->ptype==panda::PFCand::ep || bestProbe->ptype==panda::PFCand::mup)? 1:-1;
+      //probePid=211*qprobe;
+      //if(qprobe+qtag==0 && ((tagPid==13&&probePid==211)||(tagPid==-13&&probePid==-211))) {
+      //  if (verbose) printf("\t\tmade a Mu-Track pair! pTs %f, %f; system mass %f, total charge %d e\n", p4_tag->Pt(), p4_probe->Pt(), mass, qtag+qprobe);
+      //  muon_pair_tree->Fill();
+      //}
     }
     //Electron tags
     if(do_electrons) for (unsigned iTag=0; iTag < p4_ele_tag_.size(); iTag++) {
@@ -805,23 +837,57 @@ void make_tnp_skim(
       qtag    = q_ele_tag_[iTag];
       tagPid = -13*q_ele_tag_[iTag];
       truth_tag    = truth_ele_tag_[iTag];
-      for(unsigned iCH=0; iCH < chProbes.size(); iCH++) {
+      
+      float bestProbeMass, bestProbeMassDiff=999; unsigned bestProbeIdx=0; bool foundBestProbe=false;
+      vector<float> chPairMass; chPairMass.reserve(chProbes.size());
+      vector<bool> chPairOppositeSign; chPairOppositeSign.reserve(chProbes.size());
+      
+      // We have to loop over the probes completely twice
+      // This first loop computes the pair masses and the probe multiplicity
+      probeMultiplicity=0; 
+      for(unsigned iCH=0; iCH < chProbes.size(); iCH++) { 
+        *p4_probe=chProbes[iCH]->p4(); 
+        *genp4_probe = chProbeGenP4s[iCH];
+        TLorentzVector systemP4 = (*p4_tag) + (*p4_probe);
+        mass = systemP4.M();
+        chPairMass.push_back(mass);
+        if((qtag+qprobe)!=0) continue;
+        if( p4_tag->DeltaR(*p4_probe) < .05) continue;
+        if(mass<60.) continue;
+        // Here there should be a check on the difference between Vertex Z's, but for now we only use CH from the PV
+        probeMultiplicity++;
+        // Check if this is the pair with the mass closest to the Z mass
+        float massDiff = fabs(mass-massForArbitration);
+        if(!foundBestProbe || massDiff<bestProbeMassDiff) { 
+          bestProbeIdx = iCH;
+          bestProbeMass=mass;
+          bestProbeMassDiff=massDiff;
+          foundBestProbe=true;
+        }
+      }
+      // Now that we know the probe multiplicity, store the Mu-Pi Pairs
+      for(unsigned iCH=0; iCH < chProbes.size(); iCH++) { 
+        mass=chPairMass[iCH];
+        if(mass<40.||mass>140.) continue;
         *p4_probe=chProbes[iCH]->p4(); 
         *genp4_probe = chProbeGenP4s[iCH];
         qprobe=(chProbes[iCH]->ptype==panda::PFCand::hp || chProbes[iCH]->ptype==panda::PFCand::ep || chProbes[iCH]->ptype==panda::PFCand::mup)? 1:-1;
         probePid=211*qprobe;
         truth_probe  = chProbeTruths[iCH];
-        if( p4_tag->DeltaR(*p4_probe) < .1) continue;
-        TLorentzVector systemP4 = (*p4_tag) + (*p4_probe);
-        mass = systemP4.M();
-        if(mass<40.||mass>140.) continue;
-        if(qtag+qprobe!=0) {
-          if(nZCand!=0 || chMuProbeReco[iCH] || chEleProbeReco[iCH])  continue;
-          pass=0;
-          if (verbose) printf("\t\tmade an E-Pi pair! pTs %f, %f; system mass %f, total charge %d e\n", p4_tag->Pt(), p4_probe->Pt(), mass, qtag+qprobe);
+        pass=0;
+        if((qtag+qprobe)!=0) { // Handle Same-Sign E-Pi Pairs
+          if(nZCand!=0 || chMuProbeReco[iCH] || chEleProbeReco[iCH]) continue; // Z veto
+          if (verbose) printf("\t\tmade a Same Sign E Track pair! pTs %f, %f; system mass %f, total charge %d e, pass=%d\n", p4_tag->Pt(), p4_probe->Pt(), mass, qtag+qprobe, pass);
           electron_pair_tree->Fill();
-        } 
+        } else { // Handle Opposite Sign Mu-Pi Pairs
+          bestMass = (bestProbeIdx==iCH);
+          if(chEleProbePass[iCH]) pass |= 1<<11;
+          if(chMuProbePass[iCH])  pass |= 1<<13;
+          if (verbose) printf("\t\tmade an Opposte Sign E Track pair! pTs %f, %f; system mass %f, total charge %d e\n", p4_tag->Pt(), p4_probe->Pt(), mass, qtag+qprobe);
+          electron_pair_tree->Fill();
+        }
       }
+      
     }
   }
   input_file->Close();

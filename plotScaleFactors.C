@@ -249,3 +249,18 @@ void doAll() {
   scale_factors("2017-10-19/muons/mc_lo","2017-10-19/muons/mc_lo","mu_medium_2016_lo.cfg",2400,1200,0,0,50,100);
   system("eog 2017-10-19/*/*/scalefactors*_Medium_*on_0*.png &");
 }
+void doAll2() {
+  system("rm 2018-01-08_splitEraPileup/*/*/*_Medium_Muon*.p*");
+  system("rm 2018-01-08_splitEraPileup/*/*/*_Medium_Electron*.p*");
+  scale_factors("2018-01-08_splitEraPileup/electrons/bkg_lpi_emu_BtoF","2018-01-08_splitEraPileup/electrons/bkg_lpi_emu_BtoF","ele_medium_2016_BtoF.cfg",2400,1200,0,0,10,40);
+  scale_factors("2018-01-08_splitEraPileup/electrons/bkg_lpi_emu_BtoF","2018-01-08_splitEraPileup/electrons/bkg_lpi_emu_BtoF","ele_medium_2016_BtoF.cfg",2400,1200,0,0,40,100);
+  scale_factors("2018-01-08_splitEraPileup/electrons/bkg_lpi_emu_GtoH","2018-01-08_splitEraPileup/electrons/bkg_lpi_emu_GtoH","ele_medium_2016_GtoH.cfg",2400,1200,0,0,10,40);
+  scale_factors("2018-01-08_splitEraPileup/electrons/bkg_lpi_emu_GtoH","2018-01-08_splitEraPileup/electrons/bkg_lpi_emu_GtoH","ele_medium_2016_GtoH.cfg",2400,1200,0,0,40,100);
+  scale_factors("2018-01-08_splitEraPileup/muons/bkg_lpi_BtoF","2018-01-08_splitEraPileup/muons/bkg_lpi_BtoF","mu_medium_2016_BtoF.cfg",2400,1200,0,0,10,40);
+  scale_factors("2018-01-08_splitEraPileup/muons/bkg_lpi_BtoF","2018-01-08_splitEraPileup/muons/bkg_lpi_BtoF","mu_medium_2016_BtoF.cfg",2400,1200,0,0,40,50);
+  scale_factors("2018-01-08_splitEraPileup/muons/bkg_lpi_BtoF","2018-01-08_splitEraPileup/muons/bkg_lpi_BtoF","mu_medium_2016_BtoF.cfg",2400,1200,0,0,50,100);
+  scale_factors("2018-01-08_splitEraPileup/muons/bkg_lpi_GtoH","2018-01-08_splitEraPileup/muons/bkg_lpi_GtoH","mu_medium_2016_GtoH.cfg",2400,1200,0,0,10,40);
+  scale_factors("2018-01-08_splitEraPileup/muons/bkg_lpi_GtoH","2018-01-08_splitEraPileup/muons/bkg_lpi_GtoH","mu_medium_2016_GtoH.cfg",2400,1200,0,0,40,50);
+  scale_factors("2018-01-08_splitEraPileup/muons/bkg_lpi_GtoH","2018-01-08_splitEraPileup/muons/bkg_lpi_GtoH","mu_medium_2016_GtoH.cfg",2400,1200,0,0,50,100);
+  //system("eog 2017-10-19/*/*/scalefactors*_Medium_*on_0*.png &");
+}

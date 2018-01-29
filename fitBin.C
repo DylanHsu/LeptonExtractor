@@ -38,6 +38,8 @@ using namespace RooFit;
 using namespace fitterShape;
 const int fitMassLo=60;
 const int fitMassHi=120;
+bool usePeakEstimation=false;
+bool useDynamicFreezing=false;
 RooFitResult *fitBin(
   string histName="pass_ptBin0_etaBin0",
   string dataFileName="",
@@ -158,7 +160,7 @@ RooFitResult *fitBin(
   //  ((fitterShape::bkgErfcExpPlusExp*)bkgFitterShape)->gamma->setVal(bkgEstimator->GetParameter(1));
   //  //((fitterShape::bkgErfcExpPlusExp*)bkgFitterShape)->mpv->setVal(dataHist->GetMean());
   //}
-  if(true) { //if(!(bkgFitterShape->templateHist!=0)) {
+  if(usePeakEstimation) {
    printf("###########################################\n");
    printf("# Performing peak estimation procedure    #\n");
    printf("###########################################\n");
@@ -257,7 +259,7 @@ RooFitResult *fitBin(
   vector<RooRealVar*> parsFrozen;
   
   // First perform the fit to low mass only
-  if(bkgFitterShape->templateHist==0) {
+  if(bkgFitterShape->templateHist==0 && useDynamicFreezing) {
    printf("###########################################\n");
    printf("# Low mass fit with dynamic freezing      #\n");
    printf("###########################################\n");
@@ -299,42 +301,47 @@ RooFitResult *fitBin(
   }
 
   // Perform the actual fit
-  printf("###########################################\n");
-  printf("# Real fit with dynamic freezing          #\n");
-  printf("###########################################\n");
-  bombingRuns=1; while(bombingRuns<=nInitFloatingPars-1) {
-   TString rangeName=Form("fitRange_%d",bombingRuns);
+  if(useDynamicFreezing) {
+   printf("###########################################\n");
+   printf("# Real fit with dynamic freezing          #\n");
+   printf("###########################################\n");
+   bombingRuns=1; while(bombingRuns<=nInitFloatingPars-1) {
+    TString rangeName=Form("fitRange_%d",bombingRuns);
+    m.setRange(rangeName,fitMassLo,fitMassHi);
+    fitResult = totalPdf->fitTo(*dataRDH,RooFit::Extended(),RooFit::Strategy(2),RooFit::NumCPU(1),RooFit::Save(),Range(rangeName));
+    bool isGoodFit = fitResult->covQual()>1 && fitResult->status()==0 && fitResult->edm()<1e-3;
+    if(isGoodFit) { 
+     printf("\nFit result is OK (edm %f, cov qual %d, HESSE status %d, MIGRAD status %d)\n", fitResult->edm(), fitResult->covQual(), fitResult->status()/100, fitResult->status()%10);
+     break; // ok with covariance matrix being accurate (3) or made pos-def (2)
+    }
+    // We know something is wrong with covariance matrix, need to find the problem
+    qPar=0; worstPar=0;relParError=0, worstRelParError=0;
+    printf("\nFit run %d: edm %f, cov qual %d, HESSE status %d, MIGRAD status %d, need to freeze a parameter\n", bombingRuns, fitResult->edm(), fitResult->covQual(), fitResult->status()/100, fitResult->status()%10);
+    qFloatingPars = (RooArgSet*)totalPdf->getParameters(m)->selectByAttrib("Constant",kFALSE);
+    // Start looking for questionable parameters
+    parIter=qFloatingPars->createIterator(); qPar=(RooRealVar*)parIter->Next(); unsigned iPar=0;
+    while(qPar) {
+     relParError = qPar->getError() / qPar->getVal();
+     if(
+      strcmp("Nbkg",qPar->GetName())!=0 && // Cannot treat the background normalization as a questionable parameter
+      relParError >= 0.5 && // If the parameter's error is 100% or more, it's questionable
+      relParError>worstRelParError
+     ) { worstRelParError=relParError; worstPar=qPar; }
+     qPar=(RooRealVar*)parIter->Next(); iPar++;
+    }
+    if(worstPar) {
+     printf("The worst parameter is %s , relative parameter error %f. Freezing it and retrying the fit...\n", worstPar->GetName(), worstRelParError);
+     worstPar->setConstant();
+    } else {
+     printf("Couldn't find a questionable parameter, retry blindly\n");
+    }
+    bombingRuns++;
+   }
+  } else {
+   TString rangeName=Form("fitRange_1");
    m.setRange(rangeName,fitMassLo,fitMassHi);
    fitResult = totalPdf->fitTo(*dataRDH,RooFit::Extended(),RooFit::Strategy(2),RooFit::NumCPU(1),RooFit::Save(),Range(rangeName));
-   bool isGoodFit = fitResult->covQual()>1 && fitResult->status()==0 && fitResult->edm()<1e-3;
-   if(isGoodFit) { 
-    printf("\nFit result is OK (edm %f, cov qual %d, HESSE status %d, MIGRAD status %d)\n", fitResult->edm(), fitResult->covQual(), fitResult->status()/100, fitResult->status()%10);
-    break; // ok with covariance matrix being accurate (3) or made pos-def (2)
-   }
-   // We know something is wrong with covariance matrix, need to find the problem
-   qPar=0; worstPar=0;relParError=0, worstRelParError=0;
-   printf("\nFit run %d: edm %f, cov qual %d, HESSE status %d, MIGRAD status %d, need to freeze a parameter\n", bombingRuns, fitResult->edm(), fitResult->covQual(), fitResult->status()/100, fitResult->status()%10);
-   qFloatingPars = (RooArgSet*)totalPdf->getParameters(m)->selectByAttrib("Constant",kFALSE);
-   // Start looking for questionable parameters
-   parIter=qFloatingPars->createIterator(); qPar=(RooRealVar*)parIter->Next(); unsigned iPar=0;
-   while(qPar) {
-    relParError = qPar->getError() / qPar->getVal();
-    if(
-     strcmp("Nbkg",qPar->GetName())!=0 && // Cannot treat the background normalization as a questionable parameter
-     relParError >= 0.5 && // If the parameter's error is 100% or more, it's questionable
-     relParError>worstRelParError
-    ) { worstRelParError=relParError; worstPar=qPar; }
-    qPar=(RooRealVar*)parIter->Next(); iPar++;
-   }
-   if(worstPar) {
-    printf("The worst parameter is %s , relative parameter error %f. Freezing it and retrying the fit...\n", worstPar->GetName(), worstRelParError);
-    worstPar->setConstant();
-   } else {
-    printf("Couldn't find a questionable parameter, retry blindly\n");
-   }
-   bombingRuns++;
   }
-
    // Print fit results
   fitResult->printStream(fitResultFile,RooPrintable::kValue,RooPrintable::kVerbose);
   fitResultFile << endl;
@@ -429,7 +436,7 @@ RooFitResult *fitBin(
       int mcBin=sigTemplateHist->FindBin(dataHistWithCombErrors->GetBinCenter(nb));
       double absTemplateError;
       if(sigTemplateError) {
-        absTemplateError=sigTemplateError->GetBinContent(mcBin)/sigTemplateHist->GetBinContent(mcBin) * sigVal;
+        absTemplateError= TMath::Min( sigTemplateError->GetBinContent(mcBin)/sigTemplateHist->GetBinContent(mcBin), 1.) * sigVal;
         //absTemplateError = sigTemplateErrorConvRes->getVal(RooArgSet(m)) * sigTemplateError->Integral() * sigVal/sigTemplateHist->GetBinContent(mcBin);
       } else absTemplateError = (sigTemplateHist->GetBinContent(mcBin)>0)? sigTemplateHist->GetBinError(mcBin)/sigTemplateHist->GetBinContent(mcBin) * sigVal : sigVal;
       theError2+=absTemplateError*absTemplateError;

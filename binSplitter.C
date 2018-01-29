@@ -11,8 +11,8 @@
 
 //const int nMassBins=200;
 const int nMassBins=50;
-const bool doBtoF=false;
-const bool doGtoH=true;
+const bool doBtoF=true;
+const bool doGtoH=false;
 enum massSelType {
   kZll, 
   kEM, 
@@ -185,7 +185,7 @@ void binSplitter(
           else     weight = 1;
           if(selection==kGenZll) { TLorentzVector genDilep = (*genp4_tag) + (*genp4_probe); mass=genDilep.M(); }
           if     (pass  || ignorePassFlag) histosPass[iHisto]->Fill(mass,weight);
-          else if(!pass || ignorePassFlag) histosFail[iHisto]->Fill(mass,weight);
+          if     (!pass || ignorePassFlag) histosFail[iHisto]->Fill(mass,weight);
         }
       }
       iHisto++;
@@ -205,7 +205,9 @@ void generateJobArgs(
   string dataTemplates="SingleElectron2016_BaselineToMedium_ScaleSmearCorrections_electronTnP_binnedHistos.root",
   string mcTemplates="DYJetsToLL_BaselineToMedium_ScaleSmearCorrections_PtBinnedPlusInclusiveNLO_electronTnP_binnedHistos.root",
   string bkgTemplate1="\"\"",
-  string bkgTemplate2="\"\""
+  string bkgTemplate2="\"\"",
+  TString sigLabel="\"\"",
+  TString bkgLabel="\"\""
 ) {
   // parse bin file
   std::vector<double> fPtBinEdgesv, fEtaBinEdgesv, fPhiBinEdgesv, fNPVBinEdgesv, fJetsBinEdgesv, fMETBinEdgesv;
@@ -263,6 +265,10 @@ void generateJobArgs(
     }
     titleStringPass.ReplaceAll(" ","~");
     titleStringFail.ReplaceAll(" ","~");
+    sigLabel.ReplaceAll(" ","~");
+    bkgLabel.ReplaceAll(" ","~");
+    if(sigLabel=="") sigLabel="\"\"";
+    if(bkgLabel=="") bkgLabel="\"\"";
     ofs
       << outDir.c_str() 
       << Form(" pass_ptBin%d_etaBin%d ",iPt,iEta)
@@ -273,7 +279,7 @@ void generateJobArgs(
       << Form(" %s ", signalModel.c_str())
       << Form(" %s ", bkgModel.c_str())
       << titleStringPass.Data() 
-      << " \"\" \"\""
+      << Form(" %s %s ", sigLabel.Data(), bkgLabel.Data())
       << std::endl;
     ofs
       << outDir.c_str() 
@@ -284,8 +290,8 @@ void generateJobArgs(
       << Form(" %s ", bkgTemplate2.c_str())
       << Form(" %s ", signalModel.c_str())
       << Form(" %s ", bkgModel.c_str())
-      << titleStringPass.Data() 
-      << " \"\" \"\""
+      << titleStringFail.Data() 
+      << Form(" %s %s ", sigLabel.Data(), bkgLabel.Data())
       << std::endl;
   }}
 
