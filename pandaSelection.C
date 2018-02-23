@@ -74,6 +74,7 @@ void make_tnp_skim(
   short         tagPid ,probePid;          // particle ID
   unsigned char probeMultiplicity;
   bool          bestMass;
+  bool          probeFromHardestPV;
   TLorentzVector *p4_tag=0, *p4_probe=0;        // tag, probe 4-vector 
   TLorentzVector *genp4_tag=0, *genp4_probe=0;        // tag, probe 4-vector at generator level
 
@@ -112,6 +113,7 @@ void make_tnp_skim(
     electron_pair_tree->Branch("probePid",      &probePid,      "probePid/S"   );  
     electron_pair_tree->Branch("probeMultiplicity",    &probeMultiplicity,    "probeMultiplicity/b"   );  
     electron_pair_tree->Branch("bestMass",             &bestMass         ,    "bestMass/O"            );  
+    electron_pair_tree->Branch("probeFromHardestPV",   &probeFromHardestPV,   "probeFromHardestPV/O"  );  
     if(!real_data) {
       electron_pair_tree->Branch("truth_tag",     &truth_tag,     "truth_tag/F"     );  
       electron_pair_tree->Branch("truth_probe",   &truth_probe,   "truth_probe/F"   );
@@ -142,6 +144,7 @@ void make_tnp_skim(
     muon_pair_tree->Branch("probePid", &probePid, "probePid/S"   );  
     muon_pair_tree->Branch("probeMultiplicity",    &probeMultiplicity,    "probeMultiplicity/b"   );  
     muon_pair_tree->Branch("bestMass",             &bestMass         ,    "bestMass/O"            );  
+    muon_pair_tree->Branch("probeFromHardestPV",   &probeFromHardestPV,   "probeFromHardestPV/O"  );  
     if(!real_data) {
       muon_pair_tree->Branch("genTag",   "TLorentzVector", &genp4_tag   );  
       muon_pair_tree->Branch("genProbe", "TLorentzVector", &genp4_probe );      
@@ -172,7 +175,7 @@ void make_tnp_skim(
   TTree* tree = (TTree*)input_file->Get("events"); // get the tree object from the file
   panda::Event event; // create an Event object
   event.setStatus(*tree, {"!*"});
-  event.setAddress(*tree, {"runNumber", "lumiNumber", "eventNumber", "muons", "electrons", "npv", "npvTrue", "genParticles","isData","pfMet","chsAK4Jets","pfCandidates","vertices","weight"}); 
+  event.setAddress(*tree, {"runNumber", "lumiNumber", "eventNumber", "muons", "electrons", "npv", "npvTrue", "genParticles","isData","pfMet","chsAK4Jets","pfCandidates","vertices","weight","tracks","vertices"}); 
   Long64_t nEntries = tree->GetEntries();
   Long64_t sum_mc_weights=0;  
   Float_t fMVACut[4][4];
@@ -295,10 +298,6 @@ void make_tnp_skim(
       //Passing criteria for Jet Pt
       if(jet.pt()<30) continue;
       
-      //DEBUG: Jet Pt printout:
-      if (verbose)
-        std::cout << jet.pt() << std::endl;
-
       //Determine if Jet is actually electron: if not, add to list of Jets
       bool isElectron = false; bool isMuon = false;
       for(unsigned iE = 0; iE != event.electrons.size(); ++iE){
@@ -331,6 +330,7 @@ void make_tnp_skim(
     std::vector<TLorentzVector> genp4_ele_tag_, genp4_ele_passing_probe_, genp4_ele_failing_probe_, genp4_mu_tag_, genp4_mu_passing_probe_, genp4_mu_failing_probe_;
     std::vector<int> q_ele_tag_, q_ele_passing_probe_, q_ele_failing_probe_, q_mu_tag_, q_mu_passing_probe_, q_mu_failing_probe_;
     std::vector<double>truth_ele_tag_,truth_ele_failing_probe_,truth_ele_passing_probe_,truth_mu_tag_,truth_mu_passing_probe_,truth_mu_failing_probe_;
+    std::vector<float> vz_mu_tag_, vz_ele_tag_;
 
     // Loop over Electrons
     if (event.electrons.size()>0) { for (unsigned iE = 0; iE != event.electrons.size(); ++iE) {
@@ -340,6 +340,8 @@ void make_tnp_skim(
       double truth = 0;
       int charge = electron.charge;
       bool pass_tag_trigger = false;
+      float vz = -99;
+      if(electron.vertex.isValid()) vz = electron.vertex.get()->z;
       double dR;
       TLorentzVector genP4;
       if (!real_data && truth_matching){
@@ -389,6 +391,7 @@ void make_tnp_skim(
           genp4_ele_tag_.push_back(genP4);
           q_ele_tag_.push_back(charge);
           truth_ele_tag_.push_back(truth);
+          vz_ele_tag_.push_back(vz);
           break;
         default:
           break;
@@ -409,11 +412,13 @@ void make_tnp_skim(
       double truth;
       bool pass_tag_trigger = false;
       double ptCorrection=1;
+      float vz = -99;
+      if(muon.vertex.isValid()) vz = muon.vertex.get()->z;
+      double dR;
       TLorentzVector genP4;
       if (!real_data && truth_matching){
         for (unsigned iG = 0; iG != event.genParticles.size(); ++iG){
           auto& genParticle = event.genParticles[iG];
-          double dR;
           if (genParticle.finalState != 1)
             continue;
            TVector3 genParticle3;
@@ -471,6 +476,7 @@ void make_tnp_skim(
           genp4_mu_tag_.push_back(genP4);
           q_mu_tag_.push_back(charge);
           truth_mu_tag_.push_back(truth);
+          vz_mu_tag_.push_back(vz);
           break;
         }
       }
@@ -670,13 +676,22 @@ void make_tnp_skim(
     // First, assemble the collection of CH probes
     vector<panda::PFCand*> chProbes;
     vector<bool> chEleProbePass, chEleProbeReco, chMuProbePass, chMuProbeReco;
+    vector<bool> chFromTheHardestPV;
     vector<float> chProbeTruths;
     vector<TLorentzVector> chProbeGenP4s;
     UShort_t iPF=0; unsigned pfRangeMax=2084;
+    chEleProbePass.reserve(event.pfCandidates.size());
+    chEleProbeReco.reserve(event.pfCandidates.size());
+    chMuProbePass.reserve(event.pfCandidates.size());
+    chMuProbeReco.reserve(event.pfCandidates.size());
+    chFromTheHardestPV.reserve(event.pfCandidates.size());
+    chProbeTruths.reserve(event.pfCandidates.size());
+    chProbeGenP4s.reserve(event.pfCandidates.size());
     for(auto& the_vertex : event.vertices) if(the_vertex.pfRangeMax<pfRangeMax && the_vertex.pfRangeMax>0) pfRangeMax=the_vertex.pfRangeMax;
     for (auto& pfCand : event.pfCandidates) {
-      if(iPF >= pfRangeMax) break; // only pf candidates from the primary vertex
-      if(pfCand.pt()<3.) break; // stop after we start getting into the softer candidates
+      bool fromTheHardestPV = (iPF < pfRangeMax);
+      //if(iPF >= pfRangeMax) break; // only pf candidates from the primary vertex
+      if(pfCand.pt()<3.) continue; 
       if(pfCand.eta()<-2.5 || pfCand.eta()>2.5) continue;
 
       // pf candidate species
@@ -699,6 +714,10 @@ void make_tnp_skim(
           break;
       }
       if(!isChargedTrack) continue;
+      if (!pfCand.track.isValid()) {
+        if(verbose) printf("\tSkipping charged PF candidate because it does not have a track reference!\n");
+        continue;
+      }
 
       bool isChargedHadron = (pfCand.ptype == panda::PFCand::hp || pfCand.ptype == panda::PFCand::hm);
       *p4_probe=pfCand.p4();
@@ -747,6 +766,17 @@ void make_tnp_skim(
         }
         if(chTruth==0) continue;
       }
+
+      bool duplicateTrack=false; panda::PFCand* theDupe;
+      // Debugging: Check if two charged PF candidates have the same track
+      if(chProbes.size()>0) for(unsigned iCH=0; iCH<chProbes.size(); iCH++) {
+        if(pfCand.track.get() == chProbes[iCH]->track.get()) { duplicateTrack=true; theDupe=chProbes[iCH]; break; }
+      }
+      if(duplicateTrack) {
+        if(verbose) printf("\tWarning: duplicate track between this charged PF (pT=%.1f, eta=%.2f, type=%d) and existing probe (pT=%.1f, eta=%.2f, type=%d)\n", pfCand.pt(), pfCand.eta(), pfCand.ptype, theDupe->pt(),theDupe->eta(), theDupe->ptype);
+        continue;
+      }
+
       chProbes.push_back(&pfCand);
       chProbeGenP4s.push_back(genP4);
       chEleProbeReco.push_back(chMatchedToRecoElectron);
@@ -754,6 +784,7 @@ void make_tnp_skim(
       chEleProbePass.push_back(chMatchedToRecoElectron && chRecoElectronIsPassing);
       chMuProbePass.push_back(chMatchedToRecoMuon && chRecoMuonIsPassing);
       chProbeTruths.push_back(chTruth);
+      chFromTheHardestPV.push_back(fromTheHardestPV);
       iPF++;
     } // Done assembling the collection of CH probes
     
@@ -767,10 +798,11 @@ void make_tnp_skim(
       truth_tag    = truth_mu_tag_[iTag];
       float bestProbeMass, bestProbeMassDiff=999; unsigned bestProbeIdx=0; bool foundBestProbe=false;
       vector<float> chPairMass; chPairMass.reserve(chProbes.size());
-      vector<bool> chPairOppositeSign; chPairOppositeSign.reserve(chProbes.size());
+      vector<float> chPairDVz ; chPairDVz .reserve(chProbes.size());
       
       // We have to loop over the probes completely twice
       // This first loop computes the pair masses and the probe multiplicity
+      if(verbose) printf("\tbeginning Muon tag probe multiplicity calculation\n");
       probeMultiplicity=0; 
       for(unsigned iCH=0; iCH < chProbes.size(); iCH++) { 
         *p4_probe=chProbes[iCH]->p4(); 
@@ -778,11 +810,18 @@ void make_tnp_skim(
         TLorentzVector systemP4 = (*p4_tag) + (*p4_probe);
         mass = systemP4.M();
         chPairMass.push_back(mass);
+        qprobe=(chProbes[iCH]->ptype==panda::PFCand::hp || chProbes[iCH]->ptype==panda::PFCand::ep || chProbes[iCH]->ptype==panda::PFCand::mup)? 1:-1;
+        float vz = 99;
+        if(chProbes[iCH]->vertex.isValid()) vz = chProbes[iCH]->vertex.get()->z;
+        if(verbose) printf("\tTag (pT=%.1f, q=%d, vz=%.2f) probe (pT=%.1f, q=%d, vz=%.2f) mass=%.2f\n", p4_tag->Pt(), qtag, vz_mu_tag_[iTag], p4_probe->Pt(), qprobe, vz, mass);
         if((qtag+qprobe)!=0) continue;
-        if( p4_tag->DeltaR(*p4_probe) < .05) continue;
+        //if( p4_tag->DeltaR(*p4_probe) < .05) continue;
         if(mass<60.) continue;
-        // Here there should be a check on the difference between Vertex Z's, but for now we only use CH from the PV
+        float dvz=fabs(vz_mu_tag_[iTag] - vz);
+        chPairDVz.push_back(dvz);
+        if(dvz > 4) continue;
         probeMultiplicity++;
+        if(verbose) printf("\tincrementing probeMultiplicity, new value -> %d\n", probeMultiplicity);
         // Check if this is the pair with the mass closest to the Z mass
         float massDiff = fabs(mass-massForArbitration);
         if(!foundBestProbe || massDiff<bestProbeMassDiff) { 
@@ -796,6 +835,7 @@ void make_tnp_skim(
       // Now that we know the probe multiplicity, store the Mu-Pi Pairs
       for(unsigned iCH=0; iCH < chProbes.size(); iCH++) { 
         mass=chPairMass[iCH];
+        if(chPairDVz[iCH] > 4) continue;
         if(mass<40.||mass>140.) continue;
         *p4_probe=chProbes[iCH]->p4(); 
         *genp4_probe = chProbeGenP4s[iCH];
@@ -840,7 +880,7 @@ void make_tnp_skim(
       
       float bestProbeMass, bestProbeMassDiff=999; unsigned bestProbeIdx=0; bool foundBestProbe=false;
       vector<float> chPairMass; chPairMass.reserve(chProbes.size());
-      vector<bool> chPairOppositeSign; chPairOppositeSign.reserve(chProbes.size());
+      vector<float> chPairDVz ; chPairDVz .reserve(chProbes.size());
       
       // We have to loop over the probes completely twice
       // This first loop computes the pair masses and the probe multiplicity
@@ -851,10 +891,15 @@ void make_tnp_skim(
         TLorentzVector systemP4 = (*p4_tag) + (*p4_probe);
         mass = systemP4.M();
         chPairMass.push_back(mass);
+        qprobe=(chProbes[iCH]->ptype==panda::PFCand::hp || chProbes[iCH]->ptype==panda::PFCand::ep || chProbes[iCH]->ptype==panda::PFCand::mup)? 1:-1;
         if((qtag+qprobe)!=0) continue;
-        if( p4_tag->DeltaR(*p4_probe) < .05) continue;
+        //if( p4_tag->DeltaR(*p4_probe) < .05) continue;
         if(mass<60.) continue;
-        // Here there should be a check on the difference between Vertex Z's, but for now we only use CH from the PV
+        float vz = 99;
+        if(chProbes[iCH]->vertex.isValid()) vz = chProbes[iCH]->vertex.get()->z;
+        float dvz=fabs(vz_ele_tag_[iTag] - vz);
+        chPairDVz.push_back(dvz);
+        if(dvz > 4) continue;
         probeMultiplicity++;
         // Check if this is the pair with the mass closest to the Z mass
         float massDiff = fabs(mass-massForArbitration);
@@ -869,6 +914,7 @@ void make_tnp_skim(
       for(unsigned iCH=0; iCH < chProbes.size(); iCH++) { 
         mass=chPairMass[iCH];
         if(mass<40.||mass>140.) continue;
+        if(chPairDVz[iCH] > 4) continue;
         *p4_probe=chProbes[iCH]->p4(); 
         *genp4_probe = chProbeGenP4s[iCH];
         qprobe=(chProbes[iCH]->ptype==panda::PFCand::hp || chProbes[iCH]->ptype==panda::PFCand::ep || chProbes[iCH]->ptype==panda::PFCand::mup)? 1:-1;

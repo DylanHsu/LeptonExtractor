@@ -10,6 +10,7 @@
 #include "TLine.h"
 #include "TCanvas.h"
 #include "TLegend.h"
+#include <TRandom3.h>
 #include <TEfficiency.h>
 
 #include <vector>
@@ -19,8 +20,8 @@
 #include <sstream>
 void plotEfficiency(std::string outputDir, std::string binFile) {
   system(Form("rm %s/*.junk 2>/dev/null",outputDir.c_str()));
-  system(Form("for i in `ls %s/plots/fitres_pass* | sort -V`; do grep summary_ $i | tr '\n' ' ' | sed 's/summary_\\w*//g' | sed 's/+\\/-//g' >> %s/passingEffs.junk; echo " " >> %s/passingEffs.junk; done",outputDir.c_str(),outputDir.c_str(),outputDir.c_str()));
-  system(Form("for i in `ls %s/plots/fitres_fail* | sort -V`; do grep summary_ $i | tr '\n' ' ' | sed 's/summary_\\w*//g' | sed 's/+\\/-//g' >> %s/failingEffs.junk; echo " " >> %s/failingEffs.junk; done",outputDir.c_str(),outputDir.c_str(),outputDir.c_str()));
+  system(Form("for i in `ls %s/plots/fitres_pass* | sort -V`; do grep summary_ $i | tr '\n' ' ' | sed 's/summary_\\w*//g' | sed 's/[+-]//g' >> %s/passingEffs.junk; echo " " >> %s/passingEffs.junk; done",outputDir.c_str(),outputDir.c_str(),outputDir.c_str()));
+  system(Form("for i in `ls %s/plots/fitres_fail* | sort -V`; do grep summary_ $i | tr '\n' ' ' | sed 's/summary_\\w*//g' | sed 's/[+-]//g' >> %s/failingEffs.junk; echo " " >> %s/failingEffs.junk; done",outputDir.c_str(),outputDir.c_str(),outputDir.c_str()));
   
   // parse bin file
   std::vector<double> fPtBinEdgesv, fEtaBinEdgesv, fPhiBinEdgesv, fNPVBinEdgesv, fJetsBinEdgesv, fMETBinEdgesv;
@@ -83,26 +84,50 @@ void plotEfficiency(std::string outputDir, std::string binFile) {
   std::ifstream fail_ifs; fail_ifs.open(Form("%s/failingEffs.junk",outputDir.c_str())); assert(fail_ifs.is_open());
   std::string inputLine;
   
+  unsigned long int time_now = static_cast<unsigned long int>(time(NULL));
+  unsigned int randomToySeed=(time_now-731178000); // random seed based on Dylan's age in seconds
+  TRandom3 toymaker(randomToySeed);
+  
   {// fill the histogram from the text file
-   double NsigPass, NsigErrPass, edmPass, fitProbPass;
-   double NsigFail, NsigErrFail, edmFail, fitProbFail;
-   double NsigTotal, eff, effLo, effHi, errLo, errHi;
+   double NsigPass, NsigErrhPass, NsigErrlPass, edmPass, fitProbPass;
+   double NsigFail, NsigErrhFail, NsigErrlFail, edmFail, fitProbFail;
+   double NsigTotal;
    bool gotLinePass, gotLineFail;
    for(unsigned int iPt=1;iPt<fPtBinEdgesv.size(); iPt++) { for(unsigned int iEta=1; iEta<fEtaBinEdgesv.size(); iEta++) { 
     if(getline(pass_ifs,inputLine)) gotLinePass=true;
     std::stringstream ss_pass(inputLine);
     if(getline(fail_ifs,inputLine)) gotLineFail=true;
     std::stringstream ss_fail(inputLine);
-    ss_pass >> NsigPass >> NsigErrPass >> edmPass >> fitProbPass;
-    ss_fail >> NsigFail >> NsigErrFail >> edmFail >> fitProbFail;
+    ss_pass >> NsigPass >> NsigErrhPass >> NsigErrlPass >> edmPass >> fitProbPass;
+    ss_fail >> NsigFail >> NsigErrhFail >> NsigErrlFail >> edmFail >> fitProbFail;
     int mcBin=h_NsigPass->GetBin(iEta,iPt);
-    NsigTotal = NsigPass+NsigFail; eff = NsigPass/NsigTotal;
-    effLo = (NsigPass - NsigErrPass) / (NsigPass + NsigFail - NsigErrPass + NsigErrFail);
-    effHi = (NsigPass + NsigErrPass) / (NsigPass + NsigFail + NsigErrPass - NsigErrFail);
-    errLo = eff - TMath::Max(0.,effLo);
-    errHi = TMath::Min(1.,effHi) - eff;
-    h_NsigPass->SetBinContent(mcBin, NsigPass); h_NsigPass->SetBinError(mcBin, NsigErrPass);
-    h_NsigFail->SetBinContent(mcBin, NsigFail); h_NsigFail->SetBinError(mcBin, NsigErrFail);
+    double NsigTotal = NsigPass+NsigFail;
+    double eff = NsigPass/NsigTotal;
+    double effLo = (NsigPass - NsigErrlPass) / (NsigPass + NsigFail - NsigErrlPass + NsigErrhFail);
+    double effHi = (NsigPass + NsigErrhPass) / (NsigPass + NsigFail + NsigErrlPass - NsigErrlFail);
+    // conservatively estimate the variance of efficiency
+    double effEstError = TMath::Max( fabs(effLo-eff), fabs(effHi-eff));
+    TH1F *toyEffs = new TH1F("toyEffs","toyEffs", 100, TMath::Max(0.,eff-5*effEstError), TMath::Min(1.,eff+5*effEstError));
+    printf("toyEffs %.3f to %.3f\n", toyEffs->GetBinLowEdge(1), toyEffs->GetBinLowEdge(101));
+    for(int iToy=0; iToy<1000; iToy++) {
+      // Toys are Gaussian about 0 with sigma 1
+      double toyPass=toymaker.Gaus(0,1);
+      double toyFail=toymaker.Gaus(0,1);
+      // Use the upper or lower error bar on the signal size based on the sign of the toys
+      double toyNPass = NsigPass + toyPass * (toyPass>0? NsigErrhPass : NsigErrlPass);
+      double toyNFail = NsigFail + toyFail * (toyFail>0? NsigErrhFail : NsigErrlFail);
+      double toyEff = toyNPass/(toyNPass+toyNFail);
+      printf("toyEff #%d: %.3f\n", iToy, toyEff);
+      toyEffs->Fill(toyEff);
+    }
+    double quantileProbs[3]={0.159,0.5,0.841};
+    double theQuantiles[3];
+    toyEffs->GetQuantiles(3, theQuantiles, quantileProbs);
+    delete toyEffs;
+    double errLo = TMath::Max(0.,eff - TMath::Max(0.,theQuantiles[0]));
+    double errHi = TMath::Max(0.,TMath::Min(1.,theQuantiles[2]) - eff);
+    h_NsigPass->SetBinContent(mcBin, NsigPass); h_NsigPass->SetBinError(mcBin, TMath::Max(NsigErrlPass,NsigErrhPass));
+    h_NsigFail->SetBinContent(mcBin, NsigFail); h_NsigFail->SetBinError(mcBin, TMath::Max(NsigErrhFail,NsigErrlFail));
     hEffEtaPt->SetBinContent(mcBin, eff); hEffEtaPt->SetBinError(mcBin, TMath::Max(errLo,errHi));
     hErrhEtaPt->SetBinContent(mcBin, errHi); hErrlEtaPt->SetBinContent(mcBin, errLo);
     hEdmPass->SetBinContent(mcBin, TMath::Min(1.,TMath::Max(1e-6, edmPass))); hEdmFail->SetBinContent(mcBin, TMath::Min(1.,TMath::Max(1e-6, edmFail)));

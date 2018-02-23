@@ -191,7 +191,7 @@ class bkgErfcExpPlusExp: public fitterShapeBase {
    plotLabel="Sig.: MC #otimes Das";
    templateHist=templateHist_; assert(templateHist);
    mean   = new RooRealVar("sig_mean" , "sig_mean" ,    0,    -5,  2);
-   sigma  = new RooRealVar("sig_sigma", "sig_sigma", 0.01, 0.001,  5);
+   sigma  = new RooRealVar("sig_sigma", "sig_sigma", 0.01, 0.001,  2);
    kLo    = new RooRealVar("sig_kLo"  , "sig_kLo"  ,  1.5,    .3, 10);
    kHi    = new RooRealVar("sig_kHi"  , "sig_kHi"  ,  1.5,    .3, 10);
    dd = new RooGaussDoubleSidedExp("dd","dd",m,*mean,*sigma,*kLo,*kHi);
@@ -209,7 +209,7 @@ class bkgErfcExpPlusExp: public fitterShapeBase {
    plotLabel="Sig.: MC #otimes Gaus";
    templateHist=templateHist_; assert(templateHist);
    mean   = new RooRealVar("sig_mean" , "sig_mean" ,    0,    -5,  2);
-   sigma  = new RooRealVar("sig_sigma", "sig_sigma", 0.01, 0.001,  5);
+   sigma  = new RooRealVar("sig_sigma", "sig_sigma", 0.01, 0.001,  2);
    gaus   = new RooGaussian("gaus","gaus",m,*mean,*sigma);
    templateRDH = new RooDataHist("templateRDH","templateRDH",RooArgSet(m),templateHist_);
    templateRHP = new RooHistPdf("templateRHP","templateRHP",m,*templateRDH,2);
@@ -262,7 +262,7 @@ class bkgErfcExpPlusExp: public fitterShapeBase {
    delete gaus1; delete mean1; delete sigma1;
    delete gaus2; delete mean2; delete sigma2; 
    delete frac; delete sum;
-   delete theShape1, theShape2;
+   delete theShape1; delete theShape2; delete theShape;
  }
  ////////////////////////////////////////////
  templateConvLandau::templateConvLandau(RooRealVar &m, TH1D *templateHist_) {
@@ -394,7 +394,7 @@ class bkgErfcExpPlusExp: public fitterShapeBase {
  bkgDasPlusExp::bkgDasPlusExp(RooRealVar &m, TH1D *templateHist_) {
   plotLabel="Bkg.: Das + exp"; 
   mean   = new RooRealVar("bkg_mean" , "bkg_mean" ,   60,    30,200);
-  sigma  = new RooRealVar("bkg_sigma", "bkg_sigma",   12,    10, 30);
+  sigma  = new RooRealVar("bkg_sigma", "bkg_sigma",   12,    10, 60);
   kLo    = new RooRealVar("bkg_kLo"  , "bkg_kLo"  ,  1.5,   .02, 10);
   kHi    = new RooRealVar("bkg_kHi"  , "bkg_kHi"  ,  1.5,   .02, 10);
   dd = new RooGaussDoubleSidedExp("bkgDas","bkgDas",m,*mean,*sigma,*kLo,*kHi);
@@ -411,7 +411,7 @@ class bkgErfcExpPlusExp: public fitterShapeBase {
  bkgDas::bkgDas(RooRealVar &m, TH1D *templateHist_) {
   plotLabel="Bkg.: Wide Das"; 
   mean   = new RooRealVar("bkg_mean" , "bkg_mean" ,   60,    30,200);
-  sigma  = new RooRealVar("bkg_sigma", "bkg_sigma",   12,    10,30);
+  sigma  = new RooRealVar("bkg_sigma", "bkg_sigma",   12,    10,60);//30
   kLo    = new RooRealVar("bkg_kLo"  , "bkg_kLo"  ,  1.5,   .02, 10); 
   kHi    = new RooRealVar("bkg_kHi"  , "bkg_kHi"  ,  1.5,   .02, 10);
   theShape = new RooGaussDoubleSidedExp("bkgModel","bkgModel",m,*mean,*sigma,*kLo,*kHi);

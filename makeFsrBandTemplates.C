@@ -16,8 +16,8 @@
 #include <sstream>
 #include <boost/algorithm/string.hpp> // include Boost, a C++ library
 
-const int fitMassLo=60;
-const int fitMassHi=120;
+const int fitMassLo=70;
+const int fitMassHi=130;
 void makeFsrBandTemplates(
   std::string templateFileName, 
   std::string genZmmFileName, 

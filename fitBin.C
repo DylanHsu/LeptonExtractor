@@ -36,10 +36,10 @@
 #include "fitterShape.h"
 using namespace RooFit;
 using namespace fitterShape;
-const int fitMassLo=60;
-const int fitMassHi=120;
+const int fitMassLo=70;
+const int fitMassHi=130;
 bool usePeakEstimation=false;
-bool useDynamicFreezing=false;
+bool useDynamicFreezing=true;
 RooFitResult *fitBin(
   string histName="pass_ptBin0_etaBin0",
   string dataFileName="",
@@ -136,7 +136,7 @@ RooFitResult *fitBin(
   // Signal+background model
   double Ndata = dataHist->Integral( dataHist->FindBin((double)fitMassLo), dataHist->FindBin((double)fitMassHi-0.01) );
   RooRealVar Ntotal = RooRealVar("Ntotal","Ntotal",Ndata,0,Ndata); Ntotal.setConstant(kTRUE);
-  RooRealVar Nbkg = RooRealVar("Nbkg","Nbkg",0.2*Ndata, 0, .9*Ndata);
+  RooRealVar Nbkg = RooRealVar("Nbkg","Nbkg",0.2*Ndata, 0, Ndata);
   
   RooFormulaVar Nsig = RooFormulaVar("Nsig","Nsig","Ntotal - Nbkg", RooArgList(Ntotal,Nbkg));
   RooAbsPdf *totalPdf = new RooAddPdf("totalPdf","totalPdf", RooArgList(*(sigFitterShape->theShape),*(bkgFitterShape->theShape)), RooArgList(Nsig,Nbkg));
@@ -246,9 +246,9 @@ RooFitResult *fitBin(
   }  
   RooFitResult *fitResult=0; //prefit
   m.setRange("Zpeak",86,96);
-  //totalPdf->fitTo(*dataRDH,RooFit::Extended(),RooFit::Strategy(1),RooFit::NumCPU(1),Range(fitMassLo,80));
+  //totalPdf->fitTo(*dataRDH,RooFit::Extended(),RooFit::Strategy(2),RooFit::NumCPU(1),Range(fitMassLo,80));
   m.setRange("lowMass",fitMassLo,80);
-  //fitResult=totalPdf->fitTo(*dataRDH,RooFit::Extended(),RooFit::Strategy(1),RooFit::NumCPU(1),Range("lowMass"));
+  //fitResult=totalPdf->fitTo(*dataRDH,RooFit::Extended(),RooFit::Strategy(2),RooFit::NumCPU(1),Range("lowMass"));
 
   int bombingRuns;
   int nInitFloatingPars=((RooArgSet*)totalPdf->getParameters(m)->selectByAttrib("Constant",kFALSE))->getSize();
@@ -259,20 +259,20 @@ RooFitResult *fitBin(
   vector<RooRealVar*> parsFrozen;
   
   // First perform the fit to low mass only
-  if(bkgFitterShape->templateHist==0 && useDynamicFreezing) {
+  if(false) { //if(bkgFitterShape->templateHist==0 && useDynamicFreezing) {
    printf("###########################################\n");
    printf("# Low mass fit with dynamic freezing      #\n");
    printf("###########################################\n");
    bombingRuns=1; while(bombingRuns<=nInitFloatingPars-1) {
-    fitResult=totalPdf->fitTo(*dataRDH,RooFit::Extended(),RooFit::Strategy(1),RooFit::NumCPU(1),RooFit::Save(),Range("lowMass"));
+    fitResult=totalPdf->fitTo(*dataRDH,/*RooFit::Extended(),*/RooFit::Strategy(0),RooFit::NumCPU(1),RooFit::Minos(kFALSE),RooFit::Save(),Range("lowMass"));
     bool isGoodFit = fitResult->covQual()>1 && fitResult->status()==0 && fitResult->edm()<1e-3;
     if(isGoodFit) { 
-     printf("\nFit result is OK (edm %f, cov qual %d, HESSE status %d, MIGRAD status %d)\n", fitResult->edm(), fitResult->covQual(), fitResult->status()/100, fitResult->status()%10);
+     printf("\nFit result is OK (edm %f, cov qual %d, MIGRAD=%d, HESSE=%d, MINOS=%d)\n", fitResult->edm(), fitResult->covQual(), fitResult->status()%10, fitResult->status()/100, (fitResult->status()/10)%10);
      break; // ok with covariance matrix being accurate (3) or made pos-def (2)
     }
     // We know something is wrong with covariance matrix, need to find the problem
     qPar=0; worstPar=0;relParError=0, worstRelParError=0;
-    printf("\nBkg est. run %d: edm %f, cov qual %d, HESSE status %d, MIGRAD status %d, need to freeze a parameter\n", bombingRuns, fitResult->edm(), fitResult->covQual(), fitResult->status()/100, fitResult->status()%10);
+    printf("\nBkg est. run %d: edm %f, cov qual %d, MIGRAD=%d, HESSE=%d, MINOS=%d. Need to freeze a parameter\n", bombingRuns, fitResult->edm(), fitResult->covQual(), fitResult->status()%10, fitResult->status()/100, (fitResult->status()/10)%10);
     qFloatingPars = (RooArgSet*)totalPdf->getParameters(m)->selectByAttrib("Constant",kFALSE);
     // Start looking for questionable parameters
     parIter=qFloatingPars->createIterator(); qPar=(RooRealVar*)parIter->Next(); unsigned iPar=0;
@@ -280,7 +280,7 @@ RooFitResult *fitBin(
      relParError = qPar->getError() / qPar->getVal();
      if(
       strcmp("Nbkg",qPar->GetName())!=0 && // Cannot treat the background normalization as a questionable parameter
-      relParError >= 0.5 && // If the parameter's error is 100% or more, it's questionable
+      relParError >= 0.1 && // If the parameter's error is 100% or more, it's questionable
       relParError>worstRelParError
      ) { worstRelParError=relParError; worstPar=qPar;}
      qPar=(RooRealVar*)parIter->Next(); iPar++;
@@ -308,7 +308,14 @@ RooFitResult *fitBin(
    bombingRuns=1; while(bombingRuns<=nInitFloatingPars-1) {
     TString rangeName=Form("fitRange_%d",bombingRuns);
     m.setRange(rangeName,fitMassLo,fitMassHi);
-    fitResult = totalPdf->fitTo(*dataRDH,RooFit::Extended(),RooFit::Strategy(2),RooFit::NumCPU(1),RooFit::Save(),Range(rangeName));
+    fitResult = totalPdf->fitTo(*dataRDH,
+      RooFit::Extended(),
+      RooFit::Strategy(2),
+      RooFit::Minos(kTRUE),
+      RooFit::NumCPU(1),
+      RooFit::Save(),
+      Range(rangeName)
+    );
     bool isGoodFit = fitResult->covQual()>1 && fitResult->status()==0 && fitResult->edm()<1e-3;
     if(isGoodFit) { 
      printf("\nFit result is OK (edm %f, cov qual %d, HESSE status %d, MIGRAD status %d)\n", fitResult->edm(), fitResult->covQual(), fitResult->status()/100, fitResult->status()%10);
@@ -324,7 +331,7 @@ RooFitResult *fitBin(
      relParError = qPar->getError() / qPar->getVal();
      if(
       strcmp("Nbkg",qPar->GetName())!=0 && // Cannot treat the background normalization as a questionable parameter
-      relParError >= 0.5 && // If the parameter's error is 100% or more, it's questionable
+      relParError >= 0.1 && // If the parameter's error is 10% or more, it's questionable
       relParError>worstRelParError
      ) { worstRelParError=relParError; worstPar=qPar; }
      qPar=(RooRealVar*)parIter->Next(); iPar++;
@@ -340,7 +347,14 @@ RooFitResult *fitBin(
   } else {
    TString rangeName=Form("fitRange_1");
    m.setRange(rangeName,fitMassLo,fitMassHi);
-   fitResult = totalPdf->fitTo(*dataRDH,RooFit::Extended(),RooFit::Strategy(2),RooFit::NumCPU(1),RooFit::Save(),Range(rangeName));
+   fitResult = totalPdf->fitTo(*dataRDH,
+     RooFit::Extended(),
+     RooFit::Strategy(2),
+     RooFit::Minos(kTRUE),
+     RooFit::NumCPU(1),
+     RooFit::Save(),
+     Range(rangeName)
+   );
   }
    // Print fit results
   fitResult->printStream(fitResultFile,RooPrintable::kValue,RooPrintable::kVerbose);
@@ -492,7 +506,15 @@ RooFitResult *fitBin(
   printf("fit probability: %4.2f%%\n",100.*fitProb);
   printf("signal events  : %9.2f\n",Nsig.getVal());
   printf("bkg events     : %9.2f\n",Nbkg.getVal());
-
+  
+  int sigErrorLo, sigErrorHi;
+  if(Nbkg.getAsymErrorHi()!=0 || Nbkg.getAsymErrorLo() != 0) {
+    sigErrorHi = (int)round(Nbkg.getAsymErrorHi());
+    sigErrorLo = (int)round(-Nbkg.getAsymErrorLo());
+  } else {
+    sigErrorHi = (int)round(Nbkg.getError());
+    sigErrorLo = sigErrorHi;
+  }
   // Draw fit
   TString rangeName=Form("fitRange_plotting");
   m.setRange(rangeName,fitMassLo,fitMassHi);
@@ -525,7 +547,7 @@ RooFitResult *fitBin(
   totalPdf->plotOn(frame, Name("bkgPdfLine"), Components("bkgModel"),LineColor(kCyan-6),LineStyle(kDashed),DrawOption("l"),Normalization(Ntotal.getVal(),RooAbsReal::NumEvent));
   if(!(bkgFitterShape->templateHist!=0)) totalPdf->plotOn(frame, Components("bkgModel"),VisualizeError(*fitResult,1,kTRUE),FillStyle(3245),FillColor(kCyan-6),Normalization(Ntotal.getVal(),RooAbsReal::NumEvent));
   frame->SetMinimum(0);
-  frame->SetMaximum(dataHist->GetBinContent(dataHist->GetMaximumBin())*1.5);
+  frame->SetMaximum(dataHist->GetBinContent(dataHist->GetMaximumBin())*1.7);
   frame->Draw();
   //if(0!=sigFitterShape->templateHist) {
   //  sigPdfErrorBand->SetMarkerColor(kPink-5);
@@ -549,7 +571,7 @@ RooFitResult *fitBin(
     totalPdfErrorBand->Draw("e2 same");
   }
   TLegend *legend=new TLegend(.68,.62,.95,.88);
-  legend->SetFillColor(0);
+  legend->SetFillColorAlpha(kWhite, 1.0);
   legend->AddEntry("Data", "Data","lp");
   //legend->AddEntry("totalPdfLine", "Total PDF","l");
   //if(sigFitterShape->templateHist!=0 || bkgFitterShape->templateHist!=0) legend->AddEntry(totalPdfErrorBand, "PDF Stat. Unc.","f");
@@ -558,19 +580,28 @@ RooFitResult *fitBin(
   legend->AddEntry("totalPdfLine", signalLabel!=""?signalLabel:sigFitterShape->plotLabel,"l");
   if(0!=sigFitterShape->templateHist || 0!=sigFitterShape->templateHist) legend->AddEntry(totalPdfErrorBand, "PDF Stat. Unc.","f");
   legend->AddEntry("bkgPdfLine", bkgFitterShape->plotLabel,"l");
-  if(0!=sigFitterShape->templateHist) legend->AddEntry(bkgPdfErrorBand, "Bkg. Stat. Unc.","f");
+  if(0!=bkgFitterShape->templateHist || 0!=bkgFitterShape->templateHist2) legend->AddEntry(bkgPdfErrorBand, "Bkg. Stat. Unc.","f");
   legend->Draw("same");
-  //TPaveText *fitStatsPave = new TPaveText(0.68,0.3,0.94,.58, "NDC");
-  TPaveText *fitStatsPave = new TPaveText(0.20,0.6,0.46,.88, "NDC");
+  //TPaveText *fitStatsPave = new TPaveText(0.20,0.6,0.46,.88, "NDC");
+  TPaveText *fitStatsPave = new TPaveText(0.20,0.65,0.6,.88, "NDC");
   fitStatsPave->SetFillColor(0);
   fitStatsPave->SetBorderSize(1);
   fitStatsPave->SetTextFont(42);
   fitStatsPave->AddText(Form("%d data events",(int)Ndata));
-  fitStatsPave->AddText(Form("N_{sig} %d #pm %d",(int)round(Nsig.getVal()),(int)round(sqrt(pow(Nbkg.getError(),2)+Ntotal.getVal()))));
-  fitStatsPave->AddText(Form("N_{bkg} %d #pm %d",(int)round(Nbkg.getVal()),(int)round(Nbkg.getError())));
-  fitStatsPave->AddText(Form("Fit prob. %3.1f%%", fitProb*100.));
-  fitStatsPave->AddText(Form("EDM %3.1e", fitResult->edm()));
+  fitStatsPave->AddText(Form(
+    "N_{#lower[-0.1]{sig}}=%d ^{#lower[0.3]{#plus%d}}_{#lower[-0.3]{#minus%d}}, N_{#lower[-0.2]{bkg}}=%d ^{#lower[0.3]{#plus%d}}_{#lower[-0.3]{#minus%d}}",
+    (int)round(Nsig.getVal()),
+    sigErrorHi, sigErrorLo,
+    (int)round(Nbkg.getVal()),
+    sigErrorLo, sigErrorHi
+  ));
+  fitStatsPave->AddText(Form("Fit prob. %3.1f%%, EDM %3.1e", fitProb*100., fitResult->edm()));
+  //fitStatsPave->AddText(Form("N_{sig} %d #pm %d",(int)round(Nsig.getVal()),(int)round(Nbkg.getError()))); //(int)round(sqrt(pow(Nbkg.getError(),2)+Ntotal.getVal()))));
+  //fitStatsPave->AddText(Form("N_{bkg} %d #pm %d",(int)round(Nbkg.getVal()),(int)round(Nbkg.getError())));
+  //fitStatsPave->AddText(Form("Fit prob. %3.1f%%", fitProb*100.));
+  //fitStatsPave->AddText(Form("EDM %3.1e", fitResult->edm()));
   fitStatsPave->SetTextAlign(12);
+  fitStatsPave->SetFillColorAlpha(kWhite,1.0);
   fitStatsPave->Draw("SAME");
   canvas->cd();
   TPad *pad2 = new TPad("pad2", "pad2", 0, 0.05, 1, 0.3);
@@ -623,7 +654,8 @@ RooFitResult *fitBin(
   fitResultFile << "###########################################\n";
   fitResultFile << "# Fit Summary                             #\n";
   fitResultFile << "###########################################\n";
-  fitResultFile << Form("summary_Nsig %.2f +/- %.2f\nsummary_EDM %.2e\nsummary_fitProb %.4f\n",Nsig.getVal(),sqrt(pow(Nbkg.getError(),2)+Ntotal.getVal()),fitResult->edm(),fitProb);
+  // FIXME CHANGE THIS LINE
+  fitResultFile << Form("summary_Nsig %.2f + %.2f - %.2f\nsummary_EDM %.2e\nsummary_fitProb %.4f\n",Nsig.getVal(),-Nbkg.getAsymErrorLo(),Nbkg.getAsymErrorHi(),fitResult->edm(),fitProb);
   fitResultFile.close();
   return fitResult;
 }

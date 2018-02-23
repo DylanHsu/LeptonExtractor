@@ -2,16 +2,20 @@
 #include <TTree.h>
 #include <TFile.h>
 #include <TString.h>
+#include <TSystem.h>
 #include <TLorentzVector.h>
 #include <cassert>
 #include <fstream>
 #include <sstream>
 #include <iomanip>
 #include <unistd.h>
+#include "MuonPogFitterTree.C"
 
 //const int nMassBins=200;
-const int nMassBins=50;
-const bool doBtoF=true;
+const int nMassBins=35;
+const float xmin=60;
+const float xmax=130;
+const bool doBtoF=false;
 const bool doGtoH=false;
 enum massSelType {
   kZll, 
@@ -21,11 +25,13 @@ enum massSelType {
   kMuPi, 
   kEPi,
   kZMuMuFromTrack,
+  kZMuPiFromTrack,
   kGenZll, 
   knSelTypes
 };
+TString dirPath = TString(gSystem->Getenv("CMSSW_BASE")) + "/src/";
 
-void binSplitter(
+void binSplitter( // Panda TNP Bin Splitter
   TString inputFileName, 
   TString outputFileName, 
   std::string binFile, 
@@ -129,9 +135,9 @@ void binSplitter(
   for(unsigned iPt=0;iPt<fPtBinEdgesv.size()-1; iPt++) { for(unsigned iEta=0; iEta<fEtaBinEdgesv.size()-1; iEta++) {
     char histName[256];
     sprintf(histName,"pass_ptBin%d_etaBin%d", iPt, iEta);
-    histosPass[iHisto] = new TH1D(histName,histName,nMassBins,40,140);
+    histosPass[iHisto] = new TH1D(histName,histName,nMassBins,xmin,xmax);
     sprintf(histName,"fail_ptBin%d_etaBin%d", iPt, iEta);
-    histosFail[iHisto] = new TH1D(histName,histName,nMassBins,40,140);
+    histosFail[iHisto] = new TH1D(histName,histName,nMassBins,xmin,xmax);
     iHisto++;
   }}
   int iHistoMax=iHisto-1;
@@ -194,7 +200,8 @@ void binSplitter(
   for(iHisto=0; iHisto <= iHistoMax; iHisto++) histosPass[iHisto]->Write();
   for(iHisto=0; iHisto <= iHistoMax; iHisto++) histosFail[iHisto]->Write();
   outputFile->Close();
-}
+} // End Panda Bin Splitter
+
 
 void generateJobArgs(
   string outDir,

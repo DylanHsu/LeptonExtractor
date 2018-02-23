@@ -12,9 +12,10 @@ cmsswBase = os.environ['CMSSW_BASE'];
 #os.chdir(cmsswBase+'/src/LeptonExtractor')
 ROOT.gROOT.LoadMacro(cmsswBase+'/src/LeptonExtractor/pandaSelection.C+')
 
-CATALOGDIR = '/home/cmsprod/catalog/t2mit/pandaf/008'
-#TASKNAME = 'tpskim'
-TASKNAME = 'tpskim_BtoF'
+CATALOGDIR = '/home/cmsprod/catalog/t2mit/pandaf/009'
+TASKNAME = 'tpskim'
+#TASKNAME = 'tpskim_altTag'
+#TASKNAME = 'tpskim_BtoF'
 #TASKNAME = 'tpskim_GtoH'
 
 argParser = ArgumentParser(description = "Parameters for Anaysis")
