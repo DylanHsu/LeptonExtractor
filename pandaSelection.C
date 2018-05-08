@@ -11,6 +11,7 @@
 #include <TRandom3.h>
 
 const float massForArbitration=91.1876;
+const int year=2017;
 
 struct leptonVariables {
   int tag_id            = 6; 
@@ -32,7 +33,6 @@ TString dirPath = TString(gSystem->Getenv("CMSSW_BASE")) + "/src/";
 
 typedef std::map<UInt_t,std::vector<std::pair <UInt_t, UInt_t> > > MapType;
 //string jsonFile = "certs/Cert_294927-300575_13TeV_PromptReco_Collisions17_JSON.txt";
-string jsonFile = Form("%sLeptonExtractor/certs/Cert_271036-284044_13TeV_23Sep2016ReReco_Collisions16_JSON.txt",dirPath.Data());
 
 void animator(int iEntry, int nEntries);
 bool selector(panda::Electron const&, int, int);
@@ -54,6 +54,9 @@ void make_tnp_skim(
                      int electron_trigger=3,
                    int muon_trigger=6,
                    double truth_matching_dR = 0.3){//max Delta-R for truth matching 
+  string jsonFile;
+  if(year==2016) jsonFile = Form("%sLeptonExtractor/certs/Cert_271036-284044_13TeV_23Sep2016ReReco_Collisions16_JSON.txt",dirPath.Data());
+  else if(year==2017) jsonFile = Form("%sLeptonExtractor/certs/Cert_294927-306462_13TeV_EOY2017ReReco_Collisions17_JSON_v1.txt",dirPath.Data());
   gSystem->Load("libPandaTreeObjects.so"); 
   
   //OUTPUT FILE:
@@ -159,23 +162,36 @@ void make_tnp_skim(
   
   //Load pileup corrections
   //TFile *puFile = TFile::Open(Form("%sLeptonExtractor/puWeights_80x_37ifb.root", dirPath.Data()), "READ");
-  TFile *puFile = TFile::Open(Form("%sLeptonExtractor/puWeights_2016_bf.root", dirPath.Data()), "READ");
+  //TFile *puFile = TFile::Open(Form("%sLeptonExtractor/puWeights_2016_bf.root", dirPath.Data()), "READ");
   //TFile *puFile = TFile::Open(Form("%sLeptonExtractor/puWeights_2016_gh.root", dirPath.Data()), "READ");
-  TH1D *puWeights = (TH1D*)puFile->Get("puWeights"); puWeights->SetDirectory(0);
-  puFile->Close();  
+  //TH1D *puWeights = (TH1D*)puFile->Get("puWeights"); puWeights->SetDirectory(0);
+  //puFile->Close();  
 
   //INPUT FILE:
   //Setting up Tree files and various input variables  
   printf("Trying to open file %s...\n", input_file_name.c_str());
-  TFile*  input_file=TFile::Open(input_file_name.c_str(),"READ");
-  if(!input_file || !input_file->IsOpen()) {
-    printf("\"I couldn't open it\"~Alex Jones\n");
-    assert(0); return;
+  TFile *input_file;
+  int retries=0;
+  while(true) {
+    input_file = TFile::Open(input_file_name.c_str(),"read");
+    if(input_file && input_file->IsOpen()) break;
+    retries++;
+    if(retries>100) { throw std::runtime_error("Error opening input file"); return; }
   }
+  //TFile*  input_file=TFile::Open(input_file_name.c_str(),"READ");
+  //if(!input_file || !input_file->IsOpen()) {
+  //  printf("\"I couldn't open it\"~Alex Jones\n");
+  //  assert(0); return;
+  //}
   TTree* tree = (TTree*)input_file->Get("events"); // get the tree object from the file
   panda::Event event; // create an Event object
   event.setStatus(*tree, {"!*"});
-  event.setAddress(*tree, {"runNumber", "lumiNumber", "eventNumber", "muons", "electrons", "npv", "npvTrue", "genParticles","isData","pfMet","chsAK4Jets","pfCandidates","vertices","weight","tracks","vertices"}); 
+  event.setAddress(*tree, {"runNumber", "lumiNumber", "eventNumber", "muons", "electrons", "npv", "npvTrue", "genParticles","isData","pfMet","chsAK4Jets","pfCandidates","vertices","weight","tracks","vertices", "triggers","triggerObjects"}); 
+  
+  event.run.setLoadTrigger(true);
+  TString ele32Filter1="hltEle32L1DoubleEGWPTightGsfTrackIsoFilter";
+  TString ele32Filter2="hltEGL1SingleEGOrFilter";
+
   Long64_t nEntries = tree->GetEntries();
   Long64_t sum_mc_weights=0;  
   Float_t fMVACut[4][4];
@@ -363,7 +379,22 @@ void make_tnp_skim(
 
       if(event.isData){
         //            pass_tag_trigger = (electron.triggerMatch[panda::Electron::fHLT_Ele27_eta2p1_WPLoose_Gsf]);
-        pass_tag_trigger = (electron.triggerMatch[panda::Electron::fEl27Tight]);
+        if(year==2016) pass_tag_trigger = (electron.triggerMatch[panda::Electron::fEl27Tight]);
+        else if(year==2017) {
+          //pass_tag_trigger = (electron.triggerMatch[panda::Electron::fEl35Tight]); 
+          pass_tag_trigger=false;
+          panda::HLTObjectStore::HLTObjectVector filter1Objects, filter2Objects;
+          filter1Objects=event.triggerObjects.filterObjects(ele32Filter1.Data());
+          filter2Objects=event.triggerObjects.filterObjects(ele32Filter2.Data());
+          if(filter1Objects.size()>0 && filter2Objects.size()>0) {
+            TLorentzVector filter1ObjectP4, filter2ObjectP4;
+            filter1ObjectP4.SetPtEtaPhiM(filter1Objects[0]->pt(), filter1Objects[0]->eta(), filter1Objects[0]->phi(), filter1Objects[0]->m());
+            filter2ObjectP4.SetPtEtaPhiM(filter2Objects[0]->pt(), filter2Objects[0]->eta(), filter2Objects[0]->phi(), filter2Objects[0]->m());
+
+            if(filter1ObjectP4.DeltaR(electron.p4())<0.1 && filter2ObjectP4.DeltaR(electron.p4())<0.1)
+              pass_tag_trigger=true;
+          }
+        }
       } else{
         pass_tag_trigger = true;
       }
@@ -486,7 +517,7 @@ void make_tnp_skim(
       printf("Number of vectors in muon pass probe list:%lu\n", p4_mu_passing_probe_.size());
     }
     
-    if (!real_data) scale1fb = event.weight*puWeights->GetBinContent(event.npvTrue);
+    if (!real_data) scale1fb = event.weight; // *puWeights->GetBinContent(event.npvTrue);
     
     //ELECTRON PAIR ASSOCIATION:
     //associating electron pairs and filling tree
@@ -976,7 +1007,7 @@ void make_tnp_skim(
   printf("Complete. %lld events processed, total MC events %lld \n\n\n", nEntries, sum_mc_weights);
   //  printf("run num [%d,%d] \n", min_runNum, max_runNum); 
 
-  delete puWeights;
+  //delete puWeights;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -995,6 +1026,7 @@ double selectIsoCut(int type, int pdgId, double eta) {
     if (type==0) return 10000;
     if (type==1) return .25;
     if (type==4) return .25;
+    if (type==6) return .06;
     return 0.15;
   }
   else if(TMath::Abs(pdgId) == 11) {
@@ -1007,6 +1039,7 @@ double selectIsoCut(int type, int pdgId, double eta) {
     else if(type == 4)   return (isEB ? 0.0893 : 0.1210);
     else if(type == 5)   return (isEB ? 0.0766 : 0.0678);
     else if(type == 6)   return (isEB ? 0.0354 : 0.0646);
+    else if(type == 7)   return 0.06;
   }
   //printf("Problem with selectIsoCut! type=%d, pdgId=%d, eta=%f\n", type, pdgId,eta);
   //assert(0);
@@ -1040,6 +1073,8 @@ bool selector(
     return (muon.medium || muon.mediumBtoF) && iso < selectIsoCut(iso_bit, 13, muon.eta());
   case 6:
     return muon.tight && iso < selectIsoCut(iso_bit, 13, muon.eta());
+  case 7:
+    return muon.tight && iso < selectIsoCut(iso_bit, 13, muon.eta());
   case 0:
     return muon.loose;
   default:
@@ -1049,8 +1084,6 @@ bool selector(
 }
 
 
-
-
 bool selector(
               //Uses the standards assigned by CMS to qualify leptons(electrons)
               panda::Electron const& electron,
@@ -1058,7 +1091,8 @@ bool selector(
               int iso_bit
               ) {
   double iso = electron.combIso() / electron.pt();
-
+  float aeta = fabs(electron.eta());
+  float pt = electron.pt();
   switch (id_bit) {
   case 200:
     return electron.tight &&
@@ -1071,6 +1105,25 @@ bool selector(
     return electron.medium && iso < selectIsoCut(iso_bit, 11, electron.eta());
   case 6:
     return electron.tight && iso < selectIsoCut(iso_bit, 11, electron.eta());
+  case 7:
+    return (electron.mvaWP80 && 
+      ((
+        aeta < 1.4442 && 
+        electron.sieie < 0.012 && 
+        electron.hOverE < 0.09 &&
+        electron.ecalIso < 0.4*pt && 
+        electron.hcalIso < 0.25*pt && 
+        electron.trackIso < 0.18*pt &&
+        fabs(electron.dEtaInSeed) < 0.0095 && 
+        fabs(electron.dPhiIn) < 0.065
+      ) || (
+        aeta > 1.5660 && 
+        electron.sieie < 0.033 && 
+        electron.hOverE < 0.09 &&
+        electron.ecalIso < 0.45*pt && 
+        electron.hcalIso < 0.28*pt &&
+        electron.trackIso < 0.18*pt
+    )) && iso < selectIsoCut(iso_bit, 11, electron.eta()));
   default:
     return true;
   }
