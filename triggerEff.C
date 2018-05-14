@@ -49,14 +49,14 @@ void triggerEff(
       {"HLT_IsoMu24", "hltL3crIsoL1sSingleMu22erL1f0L2f10QL3f24QL3trkIsoFiltered0p07"},
     };
     testTriggersAndFilters = {
-      {"HLT_IsoMu24", ""},
-      {"HLT_IsoMu27", ""},
-      {"HLT_IsoMu30", ""},
-      {"HLT_Mu50"   , ""},
-      {"HLT_Mu17_TrkIsoVVL_Mu8_TrkIsoVVL_DZ_Mass3p8", ""},
-      {"HLT_Mu17_TrkIsoVVL_Mu8_TrkIsoVVL_DZ_Mass8"  , ""},
-	  {"HLT_Mu19_TrkIsoVVL_Mu9_TrkIsoVVL_DZ_Mass3p8", ""},
-	  {"HLT_Mu19_TrkIsoVVL_Mu9_TrkIsoVVL_DZ_Mass8"  , ""}
+      {"HLT_IsoMu24"                                , "hltL3crIsoL1sSingleMu22erL1f0L2f10QL3f24QL3trkIsoFiltered0p07" },
+      {"HLT_IsoMu27"                                , "hltL3crIsoL1sMu22Or25L1f0L2f10QL3f27QL3trkIsoFiltered0p07"     },
+      {"HLT_IsoMu30"                                , "hltL3crIsoL1sMu22Or25L1f0L2f10QL3f30QL3trkIsoFiltered0p07"     },
+      {"HLT_Mu50"                                   , "hltL3fL1sMu22Or25L1f0L2f10QL3Filtered50Q"                      },
+      {"HLT_Mu17_TrkIsoVVL_Mu8_TrkIsoVVL_DZ_Mass3p8", "hltDiMuon178Mass3p8Filtered"},
+      {"HLT_Mu17_TrkIsoVVL_Mu8_TrkIsoVVL_DZ_Mass8"  , "hltDiMuon178Mass8Filtered"  },
+	  {"HLT_Mu19_TrkIsoVVL_Mu9_TrkIsoVVL_DZ_Mass3p8", "hltDiMuon199Mass3p8Filtered"},
+	  {"HLT_Mu19_TrkIsoVVL_Mu9_TrkIsoVVL_DZ_Mass8"  , "hltDiMuon199Mass8Filtered"  }
     };
   } else if (trigType=="OneSETrig") {
     refTriggersAndFilters = {
@@ -89,18 +89,19 @@ void triggerEff(
       {"HLT_Ele27_WPTight_Gsf"           , "hltEle27WPTightGsfTrackIsoFilter"     },
     };
     testTriggersAndFilters = {
-      {"HLT_Ele115_CaloIdVT_GsfTrkIdT"             , ""}, 
-      {"HLT_Ele27_WPTight_Gsf"                     , ""}, 
-      {"HLT_Ele32_WPTight_Gsf"                     , ""}, 
-      {"HLT_Ele35_WPTight_Gsf"                     , ""}, 
-      {"HLT_Ele32_WPTight_Gsf_L1DoubleEG"          , ""}, 
-      {"HLT_Photon200"                             , ""}, 
-      {"HLT_Ele23_Ele12_CaloIdL_TrackIdL_IsoVL_DZ" , ""}, 
-      {"HLT_Ele23_Ele12_CaloIdL_TrackIdL_IsoVL"    , ""}, 
-      {"HLT_DiEle27_WPTightCaloOnly_L1DoubleEG"    , ""}, 
-      {"HLT_DoubleEle33_CaloIdL_MW"                , ""}, 
-      {"HLT_DoubleEle25_CaloIdL_MW"                , ""}, 
-      {"HLT_DoublePhoton70"                        , ""}, 
+      {"HLT_Ele115_CaloIdVT_GsfTrkIdT"             , "hltEle115CaloIdVTGsfTrkIdTGsfDphiFilter"            }, 
+      {"HLT_Ele27_WPTight_Gsf"                     , "hltEle27WPTightGsfTrackIsoFilter"                   }, 
+      {"HLT_Ele32_WPTight_Gsf"                     , ""                                                   }, 
+      {"HLT_Ele35_WPTight_Gsf"                     , "hltEle35noerWPTightGsfTrackIsoFilter"               }, 
+      {"HLT_Ele32_WPTight_Gsf_L1DoubleEG"          , "hltEle32L1DoubleEGWPTightGsfTrackIsoFilter"         }, 
+      {"HLT_Photon200"                             , "hltEG200HEFilter"                                   }, 
+      {"HLT_Ele23_Ele12_CaloIdL_TrackIdL_IsoVL_DZ" , "hltEle23Ele12CaloIdLTrackIdLIsoVLDZFilter"          }, 
+      {"HLT_Ele23_Ele12_CaloIdL_TrackIdL_IsoVL"    , "hltEle23Ele12CaloIdLTrackIdLIsoVLTrackIsoLeg1Filter"}, 
+      {"HLT_Ele23_Ele12_CaloIdL_TrackIdL_IsoVL"    , "hltEle23Ele12CaloIdLTrackIdLIsoVLTrackIsoLeg2Filter"}, 
+      {"HLT_DiEle27_WPTightCaloOnly_L1DoubleEG"    , "hltDiEle27L1DoubleEGWPTightHcalIsoFilter"           }, 
+      {"HLT_DoubleEle33_CaloIdL_MW"                , "hltDiEle33CaloIdLMWPMS2UnseededFilter"              }, 
+      {"HLT_DoubleEle25_CaloIdL_MW"                , "hltDiEle25CaloIdLMWPMS2UnseededFilter"              }, 
+      {"HLT_DoublePhoton70"                        , "hltDiEG70HEUnseededFilter"                          }, 
     };
   } else {
     printf("trigType not supported\n");
@@ -146,6 +147,7 @@ void triggerEff(
     if(retries>100) { throw std::runtime_error("Error opening input file"); return; }
   }
   TTree* tree = (TTree*)inputFile->Get("events"); // get the tree object from the file
+  TTree* hltTree = (TTree*)inputFile->Get("hlt"); // get the HLT tree
   
   // Initialize the Panda event object
   Event event;
@@ -176,11 +178,33 @@ void triggerEff(
   effTree->Branch("mass"               , &mass              );
   if(debug) printf("Initialized the tree successfully\n");
   
+  // Check for nonexistent filters
+  vector<unsigned> refToErase, testToErase;
+  for(unsigned i=0; i<refTriggersAndFilters.size(); i++) {
+    bool filterExists=hltTree->GetEntries(Form("filters==\"%s\"",refTriggersAndFilters[i].second.Data()))>0;
+    if(!filterExists) refToErase.push_back(i);
+  }
+  for(unsigned i=0; i<testTriggersAndFilters.size(); i++) {
+    bool filterExists=hltTree->GetEntries(Form("filters==\"%s\"",testTriggersAndFilters[i].second.Data()))>0;
+    if(!filterExists) testToErase.push_back(i);
+  }
+  for(auto const &idx: refToErase)
+    refTriggersAndFilters.erase(refTriggersAndFilters.begin()+idx);
+  for(auto const &idx: testToErase)
+    testTriggersAndFilters.erase(testTriggersAndFilters.begin()+idx);
+  
+  assert(refTriggersAndFilters.size()>0);
+  assert(testTriggersAndFilters.size()>0);
+
   // Register the triggers
-  for(auto const &triggerAndFilter: refTriggersAndFilters)
+  for(auto const &triggerAndFilter: refTriggersAndFilters) {
+    if(debug) printf("registering reference trigger %s\n",triggerAndFilter.first.Data());
     refTriggerTokens.push_back( event.registerTrigger( triggerAndFilter.first.Data() ));
-  for(auto const &triggerAndFilter: testTriggersAndFilters)
+  }
+  for(auto const &triggerAndFilter: testTriggersAndFilters) {
+    if(debug) printf("registering test trigger %s\n",triggerAndFilter.first.Data());
     testTriggerTokens.push_back( event.registerTrigger( triggerAndFilter.first.Data()));
+  }
   
   // Loop over all of the events in the TChain
   long iEntry = 0;
@@ -237,7 +261,7 @@ void triggerEff(
             isMatched=true;
         } else {
           if(!event.triggerFired(refTriggerTokens[i])) continue;
-          if(matchLepToFilter(&event, &ele, refTriggersAndFilters[i].second.Data()))
+          if(matchLepToFilter(&event, &ele, refTriggersAndFilters[i].second.Data(),debug))
             isMatched=true;
         }
       }
@@ -259,7 +283,7 @@ void triggerEff(
       bool isMatched=false;
       for(unsigned i=0; i<refTriggerTokens.size() && !isMatched; i++) {
         if(!event.triggerFired(refTriggerTokens[i])) continue;
-        if(matchLepToFilter(&event, &mu, refTriggersAndFilters[i].second.Data()))
+        if(matchLepToFilter(&event, &mu, refTriggersAndFilters[i].second.Data(),debug))
           isMatched=true;
       }
       tightLeps.push_back(&mu);
@@ -287,7 +311,7 @@ void triggerEff(
             break;
           }
         } else { // Have to match to the trigger
-          bool matchedProbe = matchLepToFilter(&event, probeLep, triggerAndFilter.second.Data());
+          bool matchedProbe = matchLepToFilter(&event, probeLep, triggerAndFilter.second.Data(),debug);
           if(matchedProbe) {
             passTrigger=true;
             break;
@@ -325,9 +349,21 @@ void triggerEff(
   outputFile->Close();
 }
 
-bool matchLepToFilter(Event* event, Lepton* lepton, const char* filterName) {
-  HLTObjectStore::HLTObjectVector objects = event->triggerObjects.filterObjects(filterName);
-  //if(objects.size()==0) printf("Warning: HLTObjectVector is empty for filter \"%s\"\n", filterName);
+bool matchLepToFilter(
+  Event* event, 
+  Lepton* lepton, 
+  const char* filterName,
+  bool debug
+) {
+  HLTObjectStore::HLTObjectVector objects;
+  try {
+    objects = event->triggerObjects.filterObjects(filterName);
+  } catch (const std::exception& e) {
+    if(debug) printf("Warning: filter %s is unknown at this point in time\n",filterName);
+    return false;
+  }
+  if(debug && objects.size()==0)
+    printf("Warning: HLTObjectVector is empty for filter \"%s\"\n", filterName);
   for(auto& object : objects)
     if(lepton->p4().DeltaR(object->p4())<0.1) return true;
   return false;

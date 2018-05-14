@@ -50,6 +50,6 @@ inline bool ElectronIP(double eta, double dxy, double dz) {
 const char* ele32Filter1="hltEle32L1DoubleEGWPTightGsfTrackIsoFilter";
 const char* ele32Filter2="hltEGL1SingleEGOrFilter";
 
-bool matchLepToFilter(Event *event, Lepton* lepton, const char* filterName);
+bool matchLepToFilter(Event *event, Lepton* lepton, const char* filterName, bool debug=false);
 
 bool checkEle32(Event *event, Lepton* lepton);
