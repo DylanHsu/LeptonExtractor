@@ -70,9 +70,9 @@ void triggerEff(
     };
   } else if (trigType=="SETrigSoup") {
     refTriggersAndFilters = {
-      //{"HLT_Ele32_WPTight_Gsf",""} // special case
+      {"HLT_Ele32_WPTight_Gsf",""} // special case
       //{"HLT_Ele35_WPTight_Gsf"           , "hltEle35noerWPTightGsfTrackIsoFilter"      },
-      {"HLT_Ele32_WPTight_Gsf_L1DoubleEG", "hltEle32L1DoubleEGWPTightGsfTrackIsoFilter"},
+      //{"HLT_Ele32_WPTight_Gsf_L1DoubleEG", "hltEle32L1DoubleEGWPTightGsfTrackIsoFilter"},
     };
     testTriggersAndFilters = {
       {"HLT_Ele115_CaloIdVT_GsfTrkIdT"   , "hltEle115CaloIdVTGsfTrkIdTGsfDphiFilter"   },  
@@ -403,6 +403,5 @@ bool checkEle32(Event* event, Lepton *lepton) {
     if(lepton->p4().DeltaR(object->p4())<0.1) { matchFilter1=true; break; }
   for(auto& object : filter2Objects)
     if(lepton->p4().DeltaR(object->p4())<0.1) { matchFilter2=true; break; }
-  //return matchFilter1 && matchFilter2;
-  return matchFilter2;
+  return matchFilter1 && matchFilter2;
 }
