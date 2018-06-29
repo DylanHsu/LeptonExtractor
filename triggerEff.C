@@ -4,12 +4,15 @@
 typedef std::map<UInt_t,std::vector<std::pair <UInt_t, UInt_t> > > MapType;
 string jsonFile = "PandaAnalysis/data/certs/Cert_294927-306462_13TeV_EOY2017ReReco_Collisions17_JSON_v1.txt";
 
+// triggers applied for the analysis in PandaAnalysis/Flat/src/CommonMods.cc
+
 using namespace panda;
 
 void triggerEff(
   TString trigType = "OneSMTrig", // "SMTrigSoup","DMRefTrig","DMTrigSoup"
   TString inputFileName="",
   TString outputFileName="",
+  bool isData=true,
   bool debug=false
 ) {
   // Register the trigger tokens for the reference and test triggers
@@ -67,12 +70,14 @@ void triggerEff(
     };
   } else if (trigType=="SETrigSoup") {
     refTriggersAndFilters = {
-      {"HLT_Ele32_WPTight_Gsf",""} // special case
+      //{"HLT_Ele32_WPTight_Gsf",""} // special case
+      //{"HLT_Ele35_WPTight_Gsf"           , "hltEle35noerWPTightGsfTrackIsoFilter"      },
+      {"HLT_Ele32_WPTight_Gsf_L1DoubleEG", "hltEle32L1DoubleEGWPTightGsfTrackIsoFilter"},
     };
     testTriggersAndFilters = {
       {"HLT_Ele115_CaloIdVT_GsfTrkIdT"   , "hltEle115CaloIdVTGsfTrkIdTGsfDphiFilter"   },  
       {"HLT_Ele27_WPTight_Gsf"           , "hltEle27WPTightGsfTrackIsoFilter"          },
-      {"HLT_Ele32_WPTight_Gsf"           , ""                                          },
+      //{"HLT_Ele32_WPTight_Gsf"           , ""                                          },
       {"HLT_Ele35_WPTight_Gsf"           , "hltEle35noerWPTightGsfTrackIsoFilter"      },
       {"HLT_Ele32_WPTight_Gsf_L1DoubleEG", "hltEle32L1DoubleEGWPTightGsfTrackIsoFilter"},
       {"HLT_Photon200"                   , "hltEG200HEFilter"                          },
@@ -110,32 +115,36 @@ void triggerEff(
 
   UInt_t runNumber, lumiSection;
   ULong64_t eventNumber;
-  //Read json file into boost property tree
-  MapType fMap;
-  boost::property_tree::ptree jsonTree;
-  boost::property_tree::read_json(jsonFile.c_str(),jsonTree);
   
-  //Loop through boost property tree and fill the MapType structure with the list of good lumi
-  //ranges for each run
-  for (boost::property_tree::ptree::const_iterator it = jsonTree.begin(); it!=jsonTree.end(); ++it) {
-    runNumber = boost::lexical_cast<UInt_t>(it->first);
-    MapType::mapped_type &lumiPairList = fMap[runNumber];
-    boost::property_tree::ptree lumiPairListTree = it->second;
-    for (boost::property_tree::ptree::const_iterator jt = lumiPairListTree.begin(); jt!=lumiPairListTree.end(); ++jt) {
-      boost::property_tree::ptree lumiPairTree = jt->second;
-      if (lumiPairTree.size()==2) {
-        UInt_t firstLumi = boost::lexical_cast<UInt_t>(lumiPairTree.begin()->second.data());
-        UInt_t lastLumi = boost::lexical_cast<UInt_t>((++lumiPairTree.begin())->second.data());
-        lumiPairList.push_back(std::pair<UInt_t,UInt_t>(firstLumi,lastLumi));
+  MapType fMap;
+  if(isData) {
+    //Read json file into boost property tree
+    boost::property_tree::ptree jsonTree;
+    boost::property_tree::read_json(
+      Form("%s/src/%s",gSystem->Getenv("CMSSW_BASE"),jsonFile.c_str()),jsonTree);
+    
+    //Loop through boost property tree and fill the MapType structure with the list of good lumi
+    //ranges for each run
+    for (boost::property_tree::ptree::const_iterator it = jsonTree.begin(); it!=jsonTree.end(); ++it) {
+      runNumber = boost::lexical_cast<UInt_t>(it->first);
+      MapType::mapped_type &lumiPairList = fMap[runNumber];
+      boost::property_tree::ptree lumiPairListTree = it->second;
+      for (boost::property_tree::ptree::const_iterator jt = lumiPairListTree.begin(); jt!=lumiPairListTree.end(); ++jt) {
+        boost::property_tree::ptree lumiPairTree = jt->second;
+        if (lumiPairTree.size()==2) {
+          UInt_t firstLumi = boost::lexical_cast<UInt_t>(lumiPairTree.begin()->second.data());
+          UInt_t lastLumi = boost::lexical_cast<UInt_t>((++lumiPairTree.begin())->second.data());
+          lumiPairList.push_back(std::pair<UInt_t,UInt_t>(firstLumi,lastLumi));
+        }
       }
     }
-  }
-  //If running in debug mode, dump run and lumi ranges from MapType structure to verify correct json parsing
-  if (debug) {  printf("Iterating over parsed JSON:\n"); for (MapType::const_iterator it = fMap.begin(); it != fMap.end(); ++it) {
-    printf("  Run %u:\n",it->first);
-    for (MapType::mapped_type::const_iterator jt = it->second.begin(); jt < it->second.end(); ++jt) printf("    Lumis %u - %u\n",jt->first,jt->second);
-  }}
-  
+    //If running in debug mode, dump run and lumi ranges from MapType structure to verify correct json parsing
+    if (debug) {  printf("Iterating over parsed JSON:\n"); for (MapType::const_iterator it = fMap.begin(); it != fMap.end(); ++it) {
+      printf("  Run %u:\n",it->first);
+      for (MapType::mapped_type::const_iterator jt = it->second.begin(); jt < it->second.end(); ++jt) printf("    Lumis %u - %u\n",jt->first,jt->second);
+    }}
+  } 
+
   // Open the file
   TFile *inputFile=0;
   int retries=0;
@@ -144,7 +153,7 @@ void triggerEff(
     if(inputFile && inputFile->IsOpen()) break;
     usleep(2e5);
     retries++;
-    if(retries>100) { throw std::runtime_error("Error opening input file"); return; }
+    if(retries>1000) { throw std::runtime_error("Error opening input file"); return; }
   }
   TTree* tree = (TTree*)inputFile->Get("events"); // get the tree object from the file
   TTree* hltTree = (TTree*)inputFile->Get("hlt"); // get the HLT tree
@@ -181,10 +190,12 @@ void triggerEff(
   // Check for nonexistent filters
   vector<unsigned> refToErase, testToErase;
   for(unsigned i=0; i<refTriggersAndFilters.size(); i++) {
+    if(refTriggersAndFilters[i].first=="HLT_Ele32_WPTight_Gsf") continue;
     bool filterExists=hltTree->GetEntries(Form("filters==\"%s\"",refTriggersAndFilters[i].second.Data()))>0;
     if(!filterExists) refToErase.push_back(i);
   }
   for(unsigned i=0; i<testTriggersAndFilters.size(); i++) {
+    if(testTriggersAndFilters[i].first=="HLT_Ele32_WPTight_Gsf") continue;
     bool filterExists=hltTree->GetEntries(Form("filters==\"%s\"",testTriggersAndFilters[i].second.Data()))>0;
     if(!filterExists) testToErase.push_back(i);
   }
@@ -200,11 +211,15 @@ void triggerEff(
   for(auto const &triggerAndFilter: refTriggersAndFilters) {
     if(debug) printf("registering reference trigger %s\n",triggerAndFilter.first.Data());
     refTriggerTokens.push_back( event.registerTrigger( triggerAndFilter.first.Data() ));
+    event.registerTriggerObjects(triggerAndFilter.second.Data());
   }
   for(auto const &triggerAndFilter: testTriggersAndFilters) {
     if(debug) printf("registering test trigger %s\n",triggerAndFilter.first.Data());
     testTriggerTokens.push_back( event.registerTrigger( triggerAndFilter.first.Data()));
+    event.registerTriggerObjects(triggerAndFilter.second.Data());
   }
+  event.registerTriggerObjects(ele32Filter1);
+  event.registerTriggerObjects(ele32Filter2);
   
   // Loop over all of the events in the TChain
   long iEntry = 0;
@@ -212,20 +227,22 @@ void triggerEff(
     if(debug) printf("Run %u, LS %u, evt %lld:\n", event.runNumber, event.lumiNumber, event.eventNumber);
     
     // Check data certification
-    bool certifiedEvent=false;
-    std::pair<unsigned int, unsigned int> runLumi(event.runNumber, event.lumiNumber);      
-    MapType::const_iterator it = fMap.find(runLumi.first);
-    if (it!=fMap.end()) {
-      //check lumis
-      const MapType::mapped_type &lumiPairList = it->second;
-      for (MapType::mapped_type::const_iterator jt = lumiPairList.begin(); jt<lumiPairList.end(); ++jt) {
-        if (runLumi.second >= jt->first && runLumi.second <= jt->second) {
-          //found lumi in accepted range
-          certifiedEvent=true;
+    if(isData) {
+      bool certifiedEvent=false;
+      std::pair<unsigned int, unsigned int> runLumi(event.runNumber, event.lumiNumber);      
+      MapType::const_iterator it = fMap.find(runLumi.first);
+      if (it!=fMap.end()) {
+        //check lumis
+        const MapType::mapped_type &lumiPairList = it->second;
+        for (MapType::mapped_type::const_iterator jt = lumiPairList.begin(); jt<lumiPairList.end(); ++jt) {
+          if (runLumi.second >= jt->first && runLumi.second <= jt->second) {
+            //found lumi in accepted range
+            certifiedEvent=true;
+          }
         }
       }
+      if(!certifiedEvent) { if(debug) printf("failed golden json\n"); continue; }
     }
-    if(!certifiedEvent) { if(debug) printf("failed golden json\n"); continue; }
 
     // Require reference trigger
     bool passRefTriggers=false;
@@ -236,8 +253,7 @@ void triggerEff(
     if(!passRefTriggers) {  if(debug) printf("failed reference triggers\n"); continue; }
 
     // Begin finding leptons
-    vector<Lepton*> tightLeps, refMatchedTightLeps; // tight leptons
-
+    vector<Lepton*> tightLeps, refMatchedTightLeps; 
     // Find tight electrons
     if(
       trigType == "OneSETrig" ||
@@ -245,7 +261,7 @@ void triggerEff(
       trigType == "DERefTrig" ||
       trigType == "DETrigSoup"
     ) for (auto& ele : event.electrons) {
-     float pt = ele.pt(); float eta = ele.eta(); float aeta = fabs(eta);
+      float pt = ele.pt(); float eta = ele.eta(); float aeta = fabs(eta);
       if (pt<=10 || aeta>2.5)// || (aeta>1.4442 && aeta<1.566)) // electron acceptance cuts
         continue;
       if(!ele.tight) continue;
@@ -256,19 +272,25 @@ void triggerEff(
       for(unsigned i=0; i<refTriggerTokens.size() && !isMatched; i++) {
         if(refTriggersAndFilters[i].first=="HLT_Ele32_WPTight_Gsf") {
           // Special case for Ele32
-          if(debug) printf("checking Ele32\n");
-          if(checkEle32(&event, &ele)==true)
+          if(debug) printf("checking HLT_Ele32_WPTight_Gsf\n");
+          if(checkEle32(&event, &ele)==true) {
             isMatched=true;
+            refMatchedTightLeps.push_back(&ele);
+            if(debug) printf("  passed HLT_Ele32_WPTight_Gsf\n");
+          }
         } else {
+          //printf("  checking trigger %s\n",refTriggersAndFilters[i].first.Data());
           if(!event.triggerFired(refTriggerTokens[i])) continue;
+          //printf("    trigger did fire\n");
           if(matchLepToFilter(&event, &ele, refTriggersAndFilters[i].second.Data(),debug))
             isMatched=true;
+          //printf("    isMatched=%d\n",isMatched);
         }
       }
       if(isMatched) refMatchedTightLeps.push_back(&ele);
     }
+
     // Find tight muons
-    
     if(
       trigType=="OneSMTrig" ||
       trigType=="SMTrigSoup"||
@@ -305,11 +327,6 @@ void triggerEff(
           if(checkEle32(&event, probeLep)==true) {
             passTrigger=true; break;
           }
-        } else if(triggerAndFilter.second=="") { // Only care about the event passing
-          if(event.triggerFired(testTriggerTokens[iT])) {
-            passTrigger=true;
-            break;
-          }
         } else { // Have to match to the trigger
           bool matchedProbe = matchLepToFilter(&event, probeLep, triggerAndFilter.second.Data(),debug);
           if(matchedProbe) {
@@ -326,7 +343,11 @@ void triggerEff(
         trigType== "OneSMTrig"   ||
         trigType== "SMTrigSoup"  ||
         trigType== "DMRefTrig"   ||
-        trigType== "DMTrigSoup"
+        trigType== "DMTrigSoup"  ||
+        trigType == "OneSETrig"  ||
+        trigType == "SETrigSoup" ||
+        trigType == "DERefTrig"  ||
+        trigType == "DETrigSoup"
        ) && (tagLep->charge + probeLep->charge !=0))
         continue;
 
@@ -374,6 +395,7 @@ bool checkEle32(Event* event, Lepton *lepton) {
   filter1Objects=event->triggerObjects.filterObjects(ele32Filter1);
   filter2Objects=event->triggerObjects.filterObjects(ele32Filter2);
   if(filter1Objects.size()==0 || filter2Objects.size()==0) {
+    printf("Warning: checkEle32 is missing filter objects to match to (%zu objects for %s, %zu objects for %s)\n",filter1Objects.size(),ele32Filter1,filter2Objects.size(),ele32Filter2);
     return false;
   }
   bool matchFilter1=false, matchFilter2=false;
@@ -381,5 +403,6 @@ bool checkEle32(Event* event, Lepton *lepton) {
     if(lepton->p4().DeltaR(object->p4())<0.1) { matchFilter1=true; break; }
   for(auto& object : filter2Objects)
     if(lepton->p4().DeltaR(object->p4())<0.1) { matchFilter2=true; break; }
-  return matchFilter1 && matchFilter2;
+  //return matchFilter1 && matchFilter2;
+  return matchFilter2;
 }
