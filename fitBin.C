@@ -36,8 +36,11 @@
 #include "fitterShape.h"
 using namespace RooFit;
 using namespace fitterShape;
-const int fitMassLo=70;
-const int fitMassHi=130;
+const int fitMassLo=60;
+const int fitMassHi=120;
+//const int fitMassLo=70;
+//const int fitMassHi=130;
+const float parErrorThreshold=0.5;
 bool usePeakEstimation=false;
 bool useDynamicFreezing=true;
 RooFitResult *fitBin(
@@ -74,16 +77,16 @@ RooFitResult *fitBin(
   bool useSigMCTemplate=(sigTemplateFileName!=""); if(useSigMCTemplate) {
     sigTemplateFile=TFile::Open(sigTemplateFileName.c_str(),"READ"); assert(sigTemplateFile && sigTemplateFile->IsOpen()); 
     sigTemplateHist=(TH1D*)sigTemplateFile->Get(histName.c_str()); assert(sigTemplateHist); sigTemplateHist->SetDirectory(0); sigTemplateFile->Close();
-    for(unsigned ibin=0; ibin<=(unsigned)sigTemplateHist->GetNbinsX(); ibin++) if(sigTemplateHist->GetBinContent(ibin)<=0) sigTemplateHist->SetBinContent(ibin,0.0001);
+    for(unsigned ibin=0; ibin<=(unsigned)sigTemplateHist->GetNbinsX(); ibin++) if(sigTemplateHist->GetBinContent(ibin)<0) sigTemplateHist->SetBinContent(ibin,0.);
   }  
   bool useBkgMCTemplate=(bkgTemplateFileName!=""); if(useBkgMCTemplate) {
     bkgTemplateFile=TFile::Open(bkgTemplateFileName.c_str(),"READ"); assert(bkgTemplateFile && bkgTemplateFile->IsOpen());
     bkgTemplateHist=(TH1D*)bkgTemplateFile->Get(histName.c_str()); assert(bkgTemplateHist); bkgTemplateHist->SetDirectory(0); bkgTemplateFile->Close();
-    for(unsigned ibin=0; ibin<=(unsigned)bkgTemplateHist->GetNbinsX(); ibin++) if(bkgTemplateHist->GetBinContent(ibin)<=0) bkgTemplateHist->SetBinContent(ibin,0.0001);
+    for(unsigned ibin=0; ibin<=(unsigned)bkgTemplateHist->GetNbinsX(); ibin++) if(bkgTemplateHist->GetBinContent(ibin)<0) bkgTemplateHist->SetBinContent(ibin,0.);
     if(bkgTemplateFileName2!="") {
       bkgTemplateFile2 = TFile::Open(bkgTemplateFileName2.c_str(),"READ"); assert(bkgTemplateFile2 && bkgTemplateFile2->IsOpen());
       bkgTemplateHist2=(TH1D*)bkgTemplateFile2->Get(histName.c_str()); assert(bkgTemplateHist2); bkgTemplateHist2->SetDirectory(0); bkgTemplateFile2->Close();
-      for(unsigned ibin=0; ibin<=(unsigned)bkgTemplateHist2->GetNbinsX(); ibin++) if(bkgTemplateHist2->GetBinContent(ibin)<=0) bkgTemplateHist2->SetBinContent(ibin,0.0001);
+      for(unsigned ibin=0; ibin<=(unsigned)bkgTemplateHist2->GetNbinsX(); ibin++) if(bkgTemplateHist2->GetBinContent(ibin)<0) bkgTemplateHist2->SetBinContent(ibin,0.);
     }
   }  
 
@@ -331,7 +334,7 @@ RooFitResult *fitBin(
      relParError = qPar->getError() / qPar->getVal();
      if(
       strcmp("Nbkg",qPar->GetName())!=0 && // Cannot treat the background normalization as a questionable parameter
-      relParError >= 0.1 && // If the parameter's error is 10% or more, it's questionable
+      relParError >= parErrorThreshold && // If the parameter's error is 10% or more, it's questionable
       relParError>worstRelParError
      ) { worstRelParError=relParError; worstPar=qPar; }
      qPar=(RooRealVar*)parIter->Next(); iPar++;
@@ -410,7 +413,7 @@ RooFitResult *fitBin(
     }
     m.removeRange("int");
   }
-  if(bkgFitterShape->templateHist!=0 && bkgFitterShape->resolutionFunction!=0) {
+  if(bkgFitterShape->templateHist2!=0 && bkgFitterShape->resolutionFunction!=0) {
     bkgTemplateError2=(TH1D*)bkgTemplateHist2->Clone("bkgTemplateError2"); bkgTemplateError2->SetDirectory(0);
     bkgTemplateError2->Reset(); bkgTemplateError2->Clear();
     // calculate weighted quadrature sum of the errors from all the bins, affecting bin #nb
@@ -453,6 +456,8 @@ RooFitResult *fitBin(
         absTemplateError= TMath::Min( sigTemplateError->GetBinContent(mcBin)/sigTemplateHist->GetBinContent(mcBin), 1.) * sigVal;
         //absTemplateError = sigTemplateErrorConvRes->getVal(RooArgSet(m)) * sigTemplateError->Integral() * sigVal/sigTemplateHist->GetBinContent(mcBin);
       } else absTemplateError = (sigTemplateHist->GetBinContent(mcBin)>0)? sigTemplateHist->GetBinError(mcBin)/sigTemplateHist->GetBinContent(mcBin) * sigVal : sigVal;
+      if(sigTemplateHist->GetBinContent(mcBin)==0) absTemplateError=1;
+      //printf("signal abs template error = %.2f\n",absTemplateError);
       theError2+=absTemplateError*absTemplateError;
       relTemplateError += pow(absTemplateError,2);
       sigPdfErrorBand->SetBinContent(nb, sigVal);
@@ -460,13 +465,15 @@ RooFitResult *fitBin(
       totalPdfErrorBand->SetBinContent(nb, modelVal);
       totalPdfErrorBand->SetBinError(nb,absTemplateError);
     }
-    if(0!=bkgFitterShape->templateHist) { // compute stat uncertainty from bkgnal template
+    if(0!=bkgFitterShape->templateHist) { // compute stat uncertainty from bkg template
       int mcBin=bkgTemplateHist->FindBin(dataHistWithCombErrors->GetBinCenter(nb));
       double absTemplateError;
       if(bkgTemplateError) {
         absTemplateError=bkgTemplateError->GetBinContent(mcBin)/bkgTemplateHist->GetBinContent(mcBin) * bkgVal;
         //absTemplateError = bkgTemplateErrorConvRes->getVal(RooArgSet(m)) * bkgTemplateError->Integral() * bkgVal/bkgTemplateHist->GetBinContent(mcBin);
       } else absTemplateError = (bkgTemplateHist->GetBinContent(mcBin)>0)? bkgTemplateHist->GetBinError(mcBin)/bkgTemplateHist->GetBinContent(mcBin) * bkgVal : bkgVal;
+      if(bkgTemplateHist->GetBinContent(mcBin)==0) absTemplateError=1;
+      //printf("bkg 1 abs template error = %.2f\n",absTemplateError);
       theError2+=absTemplateError*absTemplateError;
       relTemplateError += pow(absTemplateError,2);
       bkgPdfErrorBand->SetBinContent(nb, bkgVal);
@@ -474,12 +481,14 @@ RooFitResult *fitBin(
       totalPdfErrorBand->SetBinContent(nb, modelVal);
       totalPdfErrorBand->SetBinError(nb, sqrt(pow(totalPdfErrorBand->GetBinError(nb),2)+absTemplateError*absTemplateError));
     }
-    if(0!=bkgFitterShape->templateHist2) { // compute stat uncertainty from bkgnal template
+    if(0!=bkgFitterShape->templateHist2) { // compute stat uncertainty from bkg template
       int mcBin=bkgTemplateHist2->FindBin(dataHistWithCombErrors->GetBinCenter(nb));
       double absTemplateError;
       if(bkgTemplateError2) {
         absTemplateError=bkgTemplateError2->GetBinContent(mcBin)/bkgTemplateHist2->GetBinContent(mcBin) * bkgVal;
       } else absTemplateError = (bkgTemplateHist2->GetBinContent(mcBin)>0)? bkgTemplateHist2->GetBinError(mcBin)/bkgTemplateHist2->GetBinContent(mcBin) * bkgVal : bkgVal;
+      if(bkgTemplateHist2->GetBinContent(mcBin)==0) absTemplateError=1;
+      //printf("bkg 2 abs template error = %.2f\n",absTemplateError);
       theError2+=absTemplateError*absTemplateError;
       relTemplateError += pow(absTemplateError,2);
       bkgPdfErrorBand->SetBinContent(nb, bkgVal);

@@ -52,4 +52,4 @@ const char* ele32Filter2="hltEGL1SingleEGOrFilter";
 
 bool matchLepToFilter(Event *event, Lepton* lepton, const char* filterName, bool debug=false);
 
-bool checkEle32(Event *event, Lepton* lepton);
+bool checkEle32(Event *event, Lepton* lepton, bool debug=false);

@@ -108,7 +108,7 @@ void plotEfficiency(std::string outputDir, std::string binFile) {
     // conservatively estimate the variance of efficiency
     double effEstError = TMath::Max( fabs(effLo-eff), fabs(effHi-eff));
     TH1F *toyEffs = new TH1F("toyEffs","toyEffs", 100, TMath::Max(0.,eff-5*effEstError), TMath::Min(1.,eff+5*effEstError));
-    printf("toyEffs %.3f to %.3f\n", toyEffs->GetBinLowEdge(1), toyEffs->GetBinLowEdge(101));
+    //printf("toyEffs %.3f to %.3f\n", toyEffs->GetBinLowEdge(1), toyEffs->GetBinLowEdge(101));
     for(int iToy=0; iToy<1000; iToy++) {
       // Toys are Gaussian about 0 with sigma 1
       double toyPass=toymaker.Gaus(0,1);
@@ -117,7 +117,7 @@ void plotEfficiency(std::string outputDir, std::string binFile) {
       double toyNPass = NsigPass + toyPass * (toyPass>0? NsigErrhPass : NsigErrlPass);
       double toyNFail = NsigFail + toyFail * (toyFail>0? NsigErrhFail : NsigErrlFail);
       double toyEff = toyNPass/(toyNPass+toyNFail);
-      printf("toyEff #%d: %.3f\n", iToy, toyEff);
+      //printf("toyEff #%d: %.3f\n", iToy, toyEff);
       toyEffs->Fill(toyEff);
     }
     double quantileProbs[3]={0.159,0.5,0.841};

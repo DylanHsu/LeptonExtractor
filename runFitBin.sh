@@ -13,13 +13,14 @@ origDir=`pwd`
 
 #run
 source /cvmfs/cms.cern.ch/cmsset_default.sh
-cd /home/dhsu/CMSSW_8_0_29/src
+cd /home/dhsu/CMSSW_9_4_6/src
 eval `scramv1 runtime -sh`
 cd LeptonExtractor
 mkdir -p $outputDir
+#assert(0==gSystem->Load("fitBin_C.so"))
 root -b -l <<EOF
-assert(0==gSystem->Load("fitBin_C.so"))
 RooFitResult *fr=0;
+gSystem->Load("fitBin_C.so")
 printf("fitBin(\"$histName\",\"$dataFileName\",\"$sigTemplateFileName\",\"$bkgTemplateFileName\",\"$bkgTemplateFileName2\",$signalModel,$bkgModel,\"$plotTitle\",\"$outputDir\",\"$signalLabel\",\"$bkgLabel\")\n");
 fr=fitBin("$histName","$dataFileName","$sigTemplateFileName","$bkgTemplateFileName","$bkgTemplateFileName2",$signalModel,$bkgModel,"$plotTitle","$outputDir","$signalLabel","$bkgLabel");
 assert(fr);

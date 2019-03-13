@@ -273,7 +273,7 @@ void triggerEff(
         if(refTriggersAndFilters[i].first=="HLT_Ele32_WPTight_Gsf") {
           // Special case for Ele32
           if(debug) printf("checking HLT_Ele32_WPTight_Gsf\n");
-          if(checkEle32(&event, &ele)==true) {
+          if(checkEle32(&event, &ele, debug)==true) {
             isMatched=true;
             refMatchedTightLeps.push_back(&ele);
             if(debug) printf("  passed HLT_Ele32_WPTight_Gsf\n");
@@ -324,7 +324,7 @@ void triggerEff(
       unsigned iT=0;
       for(auto const &triggerAndFilter: testTriggersAndFilters) {
         if(triggerAndFilter.first=="HLT_Ele32_WPTight_Gsf") {
-          if(checkEle32(&event, probeLep)==true) {
+          if(checkEle32(&event, probeLep, debug)==true) {
             passTrigger=true; break;
           }
         } else { // Have to match to the trigger
@@ -390,18 +390,34 @@ bool matchLepToFilter(
   return false;
 }
 
-bool checkEle32(Event* event, Lepton *lepton) {
+bool checkEle32(Event* event, Lepton *lepton, bool debug) {
   HLTObjectStore::HLTObjectVector filter1Objects, filter2Objects;
   filter1Objects=event->triggerObjects.filterObjects(ele32Filter1);
   filter2Objects=event->triggerObjects.filterObjects(ele32Filter2);
   if(filter1Objects.size()==0 || filter2Objects.size()==0) {
-    printf("Warning: checkEle32 is missing filter objects to match to (%zu objects for %s, %zu objects for %s)\n",filter1Objects.size(),ele32Filter1,filter2Objects.size(),ele32Filter2);
+    if(debug) printf("Warning: checkEle32 is missing filter objects to match to (%zu objects for %s, %zu objects for %s)\n",filter1Objects.size(),ele32Filter1,filter2Objects.size(),ele32Filter2);
     return false;
   }
   bool matchFilter1=false, matchFilter2=false;
-  for(auto& object : filter1Objects)
-    if(lepton->p4().DeltaR(object->p4())<0.1) { matchFilter1=true; break; }
-  for(auto& object : filter2Objects)
-    if(lepton->p4().DeltaR(object->p4())<0.1) { matchFilter2=true; break; }
+  if(debug) printf("  Doing matching for filter 1 (\"%s\")\n", ele32Filter1);
+  for(auto& object : filter1Objects) {
+    float dR = lepton->p4().DeltaR(object->p4());
+    if(debug) printf("    Lepton (pt,eta,phi)=(%.1f,%.2f,%.2f), object (pt,eta,phi)=(%.1f,%.2f,%.2f), dR=%.2f\n", lepton->pt(), lepton->eta(), lepton->phi(), object->pt(), object->eta(), object->phi(), dR);
+    if(dR<0.1) {
+      matchFilter1=true; 
+      if(debug) printf("    Matched successfully\n");
+      break; 
+    }
+  }
+  if(debug) printf("  Doing matching for filter 2 (\"%s\")\n", ele32Filter2);
+  for(auto& object : filter2Objects) {
+    float dR = lepton->p4().DeltaR(object->p4());
+    if(debug) printf("    Lepton (pt,eta,phi)=(%.1f,%.2f,%.2f), object (pt,eta,phi)=(%.1f,%.2f,%.2f), dR=%.2f\n", lepton->pt(), lepton->eta(), lepton->phi(), object->pt(), object->eta(), object->phi(), dR);
+    if(dR<0.1) { 
+      matchFilter2=true; 
+      if(debug) printf("    Matched successfully\n");
+      break; 
+    }
+  }
   return matchFilter1 && matchFilter2;
 }

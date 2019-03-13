@@ -11,12 +11,13 @@
 #include <unistd.h>
 #include "MuonPogFitterTree.C"
 
-//const int nMassBins=200;
-const int nMassBins=35;
+//const int nMassBins=35;
+//const float xmin=60;
+//const float xmax=130;
+const int nMassBins=30;
 const float xmin=60;
-const float xmax=130;
-const bool doBtoF=false;
-const bool doGtoH=false;
+const float xmax=120;
+const int year=2016;
 enum massSelType {
   kZll, 
   kEM, 
@@ -38,9 +39,40 @@ void binSplitter( // Panda TNP Bin Splitter
   double scalefactor=1, 
   bool isMC=true,
   massSelType selection = kZll,
-  bool alt_tag=false
+  bool alt_tag=false,
+  TString pileupProfile="",
+  TString reweightBandFileName=""
 ) {
+  printf("### Running binSplitter ###\n");
   if(inputFileName==outputFileName) { printf("check output file name!\n"); return; }
+  // Load pileup weights
+  bool doBtoF=false;
+  bool doGtoH=false;
+  TH1D *puWeights=0; {
+    if(pileupProfile=="BtoF")      doBtoF=true;
+    else if(pileupProfile=="GtoH") doGtoH=true;
+    TFile *puFile = 0;
+    if(year==2016) {
+      if     (doBtoF) puFile = TFile::Open(Form("%sLeptonExtractor/puWeights_2016_bf.root", dirPath.Data()), "READ");
+      else if(doGtoH) puFile = TFile::Open(Form("%sLeptonExtractor/puWeights_2016_gh.root", dirPath.Data()), "READ");
+      else            puFile = TFile::Open(Form("%sLeptonExtractor/puWeights_80x_37ifb.root", dirPath.Data()), "READ");
+    } else {
+      puFile = TFile::Open(Form("%sLeptonExtractor/puWeights_90x.root", dirPath.Data()), "READ");
+    }
+    puWeights = (TH1D*)puFile->Get("puWeights");
+    assert(puWeights);
+    puWeights->SetDirectory(0);
+    puFile->Close();  
+  }
+  
+  // Load FSR reweight band file, but we don't load all the histograms into memory
+  TFile *reweightBandFile=0; bool useReweightBand=false;
+  if(reweightBandFileName!="" && isMC) {
+    reweightBandFile = TFile::Open(reweightBandFileName.Data());
+    assert(reweightBandFile);
+    useReweightBand=true;
+  }
+
   // parse bin file
   std::vector<double> fPtBinEdgesv, fEtaBinEdgesv, fPhiBinEdgesv, fNPVBinEdgesv, fJetsBinEdgesv, fMETBinEdgesv;
   // flags for |eta| and |phi| binning
@@ -96,8 +128,10 @@ void binSplitter( // Panda TNP Bin Splitter
   float        npu;                       // mean number of expected pileup
   float        scale1fb;                  // event weight per 1/fb
   float        mass;                      // tag-probe mass
-  int          qtag, qprobe;              // tag, probe charge
-  int          tagPid, probePid;              // tag, probe PID
+  //int          qtag, qprobe;              // tag, probe charge
+  //int          tagPid, probePid;              // tag, probe PID
+  Char_t          qtag, qprobe;              // tag, probe charge
+  Short_t      tagPid, probePid;              // tag, probe PID
   float        met;
   int          njets;
   TLorentzVector *tag=0, *probe=0;        // tag, probe 4-vector
@@ -118,7 +152,7 @@ void binSplitter( // Panda TNP Bin Splitter
   inputTree->SetBranchAddress("probePid",   &probePid);
   inputTree->SetBranchAddress("tag",      &tag);
   inputTree->SetBranchAddress("probe",    &probe);
-  if(selection==kGenZll || selection==kZMuMuFromTrack) {
+  if(selection==kGenZll || selection==kZMuMuFromTrack || useReweightBand) {
     inputTree->SetBranchAddress("genTag",      &genp4_tag);
     inputTree->SetBranchAddress("genProbe",    &genp4_probe);
   } else {
@@ -187,9 +221,22 @@ void binSplitter( // Panda TNP Bin Splitter
       bool passEta=(eta >= fEtaBinEdgesv[iEta] && eta < fEtaBinEdgesv[iEta+1]) || (pt >= 50 && ignoreEtaHighEnergy);
         if(passEta) {
           double weight;
-          if(isMC) weight = scale1fb / sum_weights->GetBinContent(1) * scalefactor;
+          if(isMC) weight = scale1fb / sum_weights->GetBinContent(1) * scalefactor * puWeights->GetBinContent(npv);
           else     weight = 1;
-          if(selection==kGenZll) { TLorentzVector genDilep = (*genp4_tag) + (*genp4_probe); mass=genDilep.M(); }
+          
+          double genMass; // Calculate the gen mass if we need it
+          if(selection==kGenZll || useReweightBand) { 
+            TLorentzVector genDilep = (*genp4_tag) + (*genp4_probe);
+            genMass=genDilep.M();
+          }
+          if(selection==kGenZll) mass=genMass;
+          if(useReweightBand) { // apply mass reweighting
+            TH1D *theReweightBand = (TH1D*)reweightBandFile->Get(Form("reweightBand_ptBin%d_etaBin%d",iPt,iEta));
+            assert(theReweightBand);
+            int m = theReweightBand->FindBin(genMass);
+            if(m>=1 && m<=theReweightBand->GetNbinsX())
+              weight *= theReweightBand->GetBinContent(m);
+          }
           if     (pass  || ignorePassFlag) histosPass[iHisto]->Fill(mass,weight);
           if     (!pass || ignorePassFlag) histosFail[iHisto]->Fill(mass,weight);
         }

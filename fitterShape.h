@@ -393,7 +393,11 @@ class bkgErfcExpPlusExp: public fitterShapeBase {
  ////////////////////////////////////////////////////
  bkgDasPlusExp::bkgDasPlusExp(RooRealVar &m, TH1D *templateHist_) {
   plotLabel="Bkg.: Das + exp"; 
-  mean   = new RooRealVar("bkg_mean" , "bkg_mean" ,   60,    30,200);
+  //mean   = new RooRealVar("bkg_mean" , "bkg_mean" ,   60,    30,200);
+  //sigma  = new RooRealVar("bkg_sigma", "bkg_sigma",   12,    10, 60);
+  //kLo    = new RooRealVar("bkg_kLo"  , "bkg_kLo"  ,  1.5,   .02, 10);
+  //kHi    = new RooRealVar("bkg_kHi"  , "bkg_kHi"  ,  1.5,   .02, 10);
+  mean   = new RooRealVar("bkg_mean" , "bkg_mean" ,   90,    30,200);
   sigma  = new RooRealVar("bkg_sigma", "bkg_sigma",   12,    10, 60);
   kLo    = new RooRealVar("bkg_kLo"  , "bkg_kLo"  ,  1.5,   .02, 10);
   kHi    = new RooRealVar("bkg_kHi"  , "bkg_kHi"  ,  1.5,   .02, 10);

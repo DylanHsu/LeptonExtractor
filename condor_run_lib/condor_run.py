@@ -15,8 +15,8 @@ class CondorRun(object):
         self.hold_on_fail = False
         self.requirements = 'UidDomain == "mit.edu"'
         self.arch = 'X86_64'
-        #self.group = 'group_t3mit'
-        self.group = 'group_t3mit.urgent'
+        self.group = 'group_t3mit'
+        #self.group = 'group_t3mit.urgent'
         self.aux_input = []
         self.min_memory = 1500
         self.num_repeats = 1
