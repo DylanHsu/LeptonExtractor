@@ -36,10 +36,10 @@
 #include "fitterShape.h"
 using namespace RooFit;
 using namespace fitterShape;
-const int fitMassLo=60;
-const int fitMassHi=120;
-//const int fitMassLo=70;
-//const int fitMassHi=130;
+//const int fitMassLo=60;
+//const int fitMassHi=120;
+const int fitMassLo=70;
+const int fitMassHi=130;
 const float parErrorThreshold=0.5;
 bool usePeakEstimation=false;
 bool useDynamicFreezing=true;

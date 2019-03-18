@@ -17,8 +17,8 @@
 #include <iostream>
 #include <string>
 #include <sstream>
-const int fitMassLo=60;
-const int fitMassHi=120;
+const int fitMassLo=70;
+const int fitMassHi=130;
 void cutAndCount(std::string outputDir, std::string binFile, std::string templateFileName) {
   system(Form("mkdir -p %s",outputDir.c_str()));
   TFile *templateFile=TFile::Open(templateFileName.c_str(),"READ"); assert(templateFile);

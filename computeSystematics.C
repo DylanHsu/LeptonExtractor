@@ -125,29 +125,62 @@ void computeAll() {
   computeSystematics("2018-02-09/trackToMediumMuonTightIso/sfMediumMuonBtoFNominal.root", "2018-02-09/trackToMediumMuonTightIso/sfMediumMuonBtoFAltBkg.root" , "scalefactors_Medium2016MuonBCDEF", "AltBkg"     , true , "Systematic from background modeling", 1200,500, 0,0, 10,120, false);  
   computeSystematics("2018-02-09/trackToMediumMuonTightIso/sfMediumMuonBtoFNominal.root", "2018-02-09/trackToMediumMuonTightIso/sfMediumMuonBtoFAltGen.root" , "scalefactors_Medium2016MuonBCDEF", "AltGen"     , true , "Systematic from generator choice"   , 1200,500, 0,0, 10,120, false);  
   computeSystematics("2018-02-09/trackToMediumMuonTightIso/sfMediumMuonBtoFNominal.root", "2018-02-09/trackToMediumMuonTightIso/sfMediumMuonBtoFAltTag.root" , "scalefactors_Medium2016MuonBCDEF", "AltTag"     , true , "Systematic from tag selection bias" , 1200,500, 0,0, 10,120, false);  
-  computeSystematics("2018-02-09/trackToMediumMuonTightIso/sfMediumMuonBtoFNominal.root", "2018-02-09/trackToMediumMuonTightIso/sfMediumMuonBtoFfsrDown.root", "scalefactors_Medium2016MuonBCDEF", "FsrModeling", true , "Systematic from FSR modeling"       , 1200,500, 0,0, 10,120, false);  
-  computeSystematics("2018-02-09/trackToMediumMuonTightIso/sfMediumMuonBtoFNominal.root", "2018-02-09/trackToMediumMuonTightIso/sfMediumMuonBtoFfsrUp.root"  , "scalefactors_Medium2016MuonBCDEF", "FsrModeling", false, "Systematic from FSR modeling"       , 1200,500, 0,0, 10,120, false);  
   computeSystematics("2018-02-09/trackToMediumMuonTightIso/sfMediumMuonBtoFNominal.root", "2018-02-09/trackToMediumMuonTightIso/sfMediumMuonBtoFResFunc.root", "scalefactors_Medium2016MuonBCDEF", "ResFunc"    , true , "Systematic from resolution modeling", 1200,500, 0,0, 10,120, false);  
+  //computeSystematics("2018-02-09/trackToMediumMuonTightIso/sfMediumMuonBtoFNominal.root", "2018-02-09/trackToMediumMuonTightIso/sfMediumMuonBtoFfsrDown.root", "scalefactors_Medium2016MuonBCDEF", "FsrModeling", true , "Systematic from FSR modeling"       , 1200,500, 0,0, 10,120, false);  
+  //computeSystematics("2018-02-09/trackToMediumMuonTightIso/sfMediumMuonBtoFNominal.root", "2018-02-09/trackToMediumMuonTightIso/sfMediumMuonBtoFfsrUp.root"  , "scalefactors_Medium2016MuonBCDEF", "FsrModeling", false, "Systematic from FSR modeling"       , 1200,500, 0,0, 10,120, false);  
+  
   computeSystematics("2018-02-09/trackToMediumMuonTightIso/sfMediumMuonGtoHNominal.root", "2018-02-09/trackToMediumMuonTightIso/sfMediumMuonGtoHAltBkg.root" , "scalefactors_Medium2016MuonGH", "AltBkg"     , true , "Systematic from background modeling", 1200,500, 0,0, 10,120, false);  
   computeSystematics("2018-02-09/trackToMediumMuonTightIso/sfMediumMuonGtoHNominal.root", "2018-02-09/trackToMediumMuonTightIso/sfMediumMuonGtoHAltGen.root" , "scalefactors_Medium2016MuonGH", "AltGen"     , true , "Systematic from generator choice"   , 1200,500, 0,0, 10,120, false);  
   computeSystematics("2018-02-09/trackToMediumMuonTightIso/sfMediumMuonGtoHNominal.root", "2018-02-09/trackToMediumMuonTightIso/sfMediumMuonGtoHAltTag.root" , "scalefactors_Medium2016MuonGH", "AltTag"     , true , "Systematic from tag selection bias" , 1200,500, 0,0, 10,120, false);  
-  computeSystematics("2018-02-09/trackToMediumMuonTightIso/sfMediumMuonGtoHNominal.root", "2018-02-09/trackToMediumMuonTightIso/sfMediumMuonGtoHfsrDown.root", "scalefactors_Medium2016MuonGH", "FsrModeling", true , "Systematic from FSR modeling"       , 1200,500, 0,0, 10,120, false);  
-  computeSystematics("2018-02-09/trackToMediumMuonTightIso/sfMediumMuonGtoHNominal.root", "2018-02-09/trackToMediumMuonTightIso/sfMediumMuonGtoHfsrUp.root"  , "scalefactors_Medium2016MuonGH", "FsrModeling", false, "Systematic from FSR modeling"       , 1200,500, 0,0, 10,120, false);  
   computeSystematics("2018-02-09/trackToMediumMuonTightIso/sfMediumMuonGtoHNominal.root", "2018-02-09/trackToMediumMuonTightIso/sfMediumMuonGtoHResFunc.root", "scalefactors_Medium2016MuonGH", "ResFunc"    , true , "Systematic from resolution modeling", 1200,500, 0,0, 10,120, false);  
+  //computeSystematics("2018-02-09/trackToMediumMuonTightIso/sfMediumMuonGtoHNominal.root", "2018-02-09/trackToMediumMuonTightIso/sfMediumMuonGtoHfsrDown.root", "scalefactors_Medium2016MuonGH", "FsrModeling", true , "Systematic from FSR modeling"       , 1200,500, 0,0, 10,120, false);  
+  //computeSystematics("2018-02-09/trackToMediumMuonTightIso/sfMediumMuonGtoHNominal.root", "2018-02-09/trackToMediumMuonTightIso/sfMediumMuonGtoHfsrUp.root"  , "scalefactors_Medium2016MuonGH", "FsrModeling", false, "Systematic from FSR modeling"       , 1200,500, 0,0, 10,120, false);  
+  
+  // Compute |(Powheg+Photos) - (Powheg+Pythia)| then transplant it into the nominal SF file
+  computeSystematics("2018-02-09/trackToMediumMuonTightIso/sfMediumMuonBtoFpowhegPhotos.root", "2018-02-09/trackToMediumMuonTightIso/sfMediumMuonBtoFpowhegPythia.root", "scalefactors_Medium2016MuonBCDEF", "FsrModeling", true , "Systematic from FSR modeling"       , 1200,500, 0,0, 10,120, false);
+  TFile *sfFile_BtoF_powheg  = TFile::Open("2018-02-09/trackToMediumMuonTightIso/sfMediumMuonBtoFpowhegPhotos.root","read");
+  TFile *sfFile_BtoF_nominal = TFile::Open("2018-02-09/trackToMediumMuonTightIso/sfMediumMuonBtoFNominal.root","update");
+  sfFile_BtoF_nominal->cd(); 
+  ((TH2D*)sfFile_BtoF_powheg->Get("scalefactors_Medium2016MuonBCDEF_FsrModeling"))->Write();
+  ((TH2D*)sfFile_BtoF_powheg->Get("pulls_FsrModeling"))->Write();
+  sfFile_BtoF_powheg->Close(); sfFile_BtoF_nominal->Close();
+  computeSystematics("2018-02-09/trackToMediumMuonTightIso/sfMediumMuonGtoHpowhegPhotos.root", "2018-02-09/trackToMediumMuonTightIso/sfMediumMuonGtoHpowhegPythia.root", "scalefactors_Medium2016MuonGH"   , "FsrModeling", true , "Systematic from FSR modeling"       , 1200,500, 0,0, 10,120, false);
+  TFile *sfFile_GtoH_powheg  = TFile::Open("2018-02-09/trackToMediumMuonTightIso/sfMediumMuonGtoHpowhegPhotos.root","read");
+  TFile *sfFile_GtoH_nominal = TFile::Open("2018-02-09/trackToMediumMuonTightIso/sfMediumMuonGtoHNominal.root","update");
+  sfFile_GtoH_nominal->cd(); 
+  ((TH2D*)sfFile_GtoH_powheg->Get("scalefactors_Medium2016MuonGH_FsrModeling"))->Write();
+  ((TH2D*)sfFile_GtoH_powheg->Get("pulls_FsrModeling"))->Write();
+  sfFile_GtoH_powheg->Close(); sfFile_GtoH_nominal->Close();
 }
 void computeAllEle() {
   computeSystematics("2018-02-27/gsfElectronToMedium/sfMediumElectronBtoFNominal.root", "2018-02-27/gsfElectronToMedium/sfMediumElectronBtoFAltBkg.root" , "scalefactors_MediumElectronBCDEF", "AltBkg"     , true , "Systematic from background modeling", 1200,500, 0,0, 10,100, false);  
   computeSystematics("2018-02-27/gsfElectronToMedium/sfMediumElectronBtoFNominal.root", "2018-02-27/gsfElectronToMedium/sfMediumElectronBtoFAltGen.root" , "scalefactors_MediumElectronBCDEF", "AltGen"     , true , "Systematic from generator choice"   , 1200,500, 0,0, 10,100, false);  
   computeSystematics("2018-02-27/gsfElectronToMedium/sfMediumElectronBtoFNominal.root", "2018-02-27/gsfElectronToMedium/sfMediumElectronBtoFAltTag.root" , "scalefactors_MediumElectronBCDEF", "AltTag"     , true , "Systematic from tag selection bias" , 1200,500, 0,0, 10,100, false);  
-  computeSystematics("2018-02-27/gsfElectronToMedium/sfMediumElectronBtoFNominal.root", "2018-02-27/gsfElectronToMedium/sfMediumElectronBtoFfsrDown.root", "scalefactors_MediumElectronBCDEF", "FsrModeling", true , "Systematic from FSR modeling"       , 1200,500, 0,0, 10,100, false);  
-  computeSystematics("2018-02-27/gsfElectronToMedium/sfMediumElectronBtoFNominal.root", "2018-02-27/gsfElectronToMedium/sfMediumElectronBtoFfsrUp.root"  , "scalefactors_MediumElectronBCDEF", "FsrModeling", false, "Systematic from FSR modeling"       , 1200,500, 0,0, 10,100, false);  
   computeSystematics("2018-02-27/gsfElectronToMedium/sfMediumElectronBtoFNominal.root", "2018-02-27/gsfElectronToMedium/sfMediumElectronBtoFResFunc.root", "scalefactors_MediumElectronBCDEF", "ResFunc"    , true , "Systematic from resolution modeling", 1200,500, 0,0, 10,100, false);  
+  //computeSystematics("2018-02-27/gsfElectronToMedium/sfMediumElectronBtoFNominal.root", "2018-02-27/gsfElectronToMedium/sfMediumElectronBtoFfsrDown.root", "scalefactors_MediumElectronBCDEF", "FsrModeling", true , "Systematic from FSR modeling"       , 1200,500, 0,0, 10,100, false);  
+  //computeSystematics("2018-02-27/gsfElectronToMedium/sfMediumElectronBtoFNominal.root", "2018-02-27/gsfElectronToMedium/sfMediumElectronBtoFfsrUp.root"  , "scalefactors_MediumElectronBCDEF", "FsrModeling", false, "Systematic from FSR modeling"       , 1200,500, 0,0, 10,100, false);  
   computeSystematics("2018-02-27/gsfElectronToMedium/sfMediumElectronGtoHNominal.root", "2018-02-27/gsfElectronToMedium/sfMediumElectronGtoHAltBkg.root" , "scalefactors_MediumElectronGH", "AltBkg"     , true , "Systematic from background modeling", 1200,500, 0,0, 10,100, false);  
   computeSystematics("2018-02-27/gsfElectronToMedium/sfMediumElectronGtoHNominal.root", "2018-02-27/gsfElectronToMedium/sfMediumElectronGtoHAltGen.root" , "scalefactors_MediumElectronGH", "AltGen"     , true , "Systematic from generator choice"   , 1200,500, 0,0, 10,100, false);  
   computeSystematics("2018-02-27/gsfElectronToMedium/sfMediumElectronGtoHNominal.root", "2018-02-27/gsfElectronToMedium/sfMediumElectronGtoHAltTag.root" , "scalefactors_MediumElectronGH", "AltTag"     , true , "Systematic from tag selection bias" , 1200,500, 0,0, 10,100, false);  
-  computeSystematics("2018-02-27/gsfElectronToMedium/sfMediumElectronGtoHNominal.root", "2018-02-27/gsfElectronToMedium/sfMediumElectronGtoHfsrDown.root", "scalefactors_MediumElectronGH", "FsrModeling", true , "Systematic from FSR modeling"       , 1200,500, 0,0, 10,100, false);  
-  computeSystematics("2018-02-27/gsfElectronToMedium/sfMediumElectronGtoHNominal.root", "2018-02-27/gsfElectronToMedium/sfMediumElectronGtoHfsrUp.root"  , "scalefactors_MediumElectronGH", "FsrModeling", false, "Systematic from FSR modeling"       , 1200,500, 0,0, 10,100, false);  
   computeSystematics("2018-02-27/gsfElectronToMedium/sfMediumElectronGtoHNominal.root", "2018-02-27/gsfElectronToMedium/sfMediumElectronGtoHResFunc.root", "scalefactors_MediumElectronGH", "ResFunc"    , true , "Systematic from resolution modeling", 1200,500, 0,0, 10,100, false);  
+  //computeSystematics("2018-02-27/gsfElectronToMedium/sfMediumElectronGtoHNominal.root", "2018-02-27/gsfElectronToMedium/sfMediumElectronGtoHfsrDown.root", "scalefactors_MediumElectronGH", "FsrModeling", true , "Systematic from FSR modeling"       , 1200,500, 0,0, 10,100, false);  
+  //computeSystematics("2018-02-27/gsfElectronToMedium/sfMediumElectronGtoHNominal.root", "2018-02-27/gsfElectronToMedium/sfMediumElectronGtoHfsrUp.root"  , "scalefactors_MediumElectronGH", "FsrModeling", false, "Systematic from FSR modeling"       , 1200,500, 0,0, 10,100, false);  
+  
+  // Compute |(Powheg+Photos) - (Powheg+Pythia)| then transplant it into the nominal SF file
+  computeSystematics("2018-02-27/gsfElectronToMedium/sfMediumElectronBtoFpowhegPhotos.root", "2018-02-27/gsfElectronToMedium/sfMediumElectronBtoFpowhegPythia.root", "scalefactors_MediumElectronBCDEF", "FsrModeling", true , "Systematic from FSR modeling"       , 1200,500, 0,0, 10,100, false);
+  TFile *sfFile_BtoF_powheg  = TFile::Open("2018-02-27/gsfElectronToMedium/sfMediumElectronBtoFpowhegPhotos.root","read");
+  TFile *sfFile_BtoF_nominal = TFile::Open("2018-02-27/gsfElectronToMedium/sfMediumElectronBtoFNominal.root","update");
+  sfFile_BtoF_nominal->cd(); 
+  ((TH2D*)sfFile_BtoF_powheg->Get("scalefactors_MediumElectronBCDEF_FsrModeling"))->Write();
+  ((TH2D*)sfFile_BtoF_powheg->Get("pulls_FsrModeling"))->Write();
+  sfFile_BtoF_powheg->Close(); sfFile_BtoF_nominal->Close();
+  computeSystematics("2018-02-27/gsfElectronToMedium/sfMediumElectronGtoHpowhegPhotos.root", "2018-02-27/gsfElectronToMedium/sfMediumElectronGtoHpowhegPythia.root", "scalefactors_MediumElectronGH", "FsrModeling", true , "Systematic from FSR modeling"       , 1200,500, 0,0, 10,100, false);
+  TFile *sfFile_GtoH_powheg  = TFile::Open("2018-02-27/gsfElectronToMedium/sfMediumElectronGtoHpowhegPhotos.root","read");
+  TFile *sfFile_GtoH_nominal = TFile::Open("2018-02-27/gsfElectronToMedium/sfMediumElectronGtoHNominal.root","update");
+  sfFile_GtoH_nominal->cd(); 
+  ((TH2D*)sfFile_GtoH_powheg->Get("scalefactors_MediumElectronGH_FsrModeling"))->Write();
+  ((TH2D*)sfFile_GtoH_powheg->Get("pulls_FsrModeling"))->Write();
+  sfFile_GtoH_powheg->Close(); sfFile_GtoH_nominal->Close();
 }
 /*  TString nominalFileName,     // root file with nominal scale factors
   TString altFileName,         // root file with the alternative scale factors

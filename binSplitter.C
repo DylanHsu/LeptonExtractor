@@ -14,9 +14,9 @@
 //const int nMassBins=35;
 //const float xmin=60;
 //const float xmax=130;
-const int nMassBins=30;
-const float xmin=60;
-const float xmax=120;
+const int nMassBins=50;
+const float xmin=40;
+const float xmax=140;
 const int year=2016;
 enum massSelType {
   kZll, 

@@ -1,4 +1,3 @@
-
 #include <vector>
 #include <fstream>
 #include <iostream>
@@ -209,7 +208,7 @@ class bkgErfcExpPlusExp: public fitterShapeBase {
    plotLabel="Sig.: MC #otimes Gaus";
    templateHist=templateHist_; assert(templateHist);
    mean   = new RooRealVar("sig_mean" , "sig_mean" ,    0,    -5,  2);
-   sigma  = new RooRealVar("sig_sigma", "sig_sigma", 0.01, 0.001,  2);
+   sigma  = new RooRealVar("sig_sigma", "sig_sigma", 0.1, 0.001,  2);
    gaus   = new RooGaussian("gaus","gaus",m,*mean,*sigma);
    templateRDH = new RooDataHist("templateRDH","templateRDH",RooArgSet(m),templateHist_);
    templateRHP = new RooHistPdf("templateRHP","templateRHP",m,*templateRDH,2);
